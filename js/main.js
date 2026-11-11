@@ -1,5 +1,10 @@
-import { Game } from "./game.js";
+import { Game } from "./game.js?v=menu-win18";
 
 window.addEventListener("DOMContentLoaded", () => {
-  new Game();
+  try {
+    window.__bella = new Game();
+  } catch (err) {
+    console.error("[Bella Luna] boot failed", err);
+    throw err;
+  }
 });

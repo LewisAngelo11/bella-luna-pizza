@@ -5,7 +5,7 @@ import {
   ACTIONS,
   DEATHS,
 } from "./rules.js";
-import { Renderer } from "./renderer.js";
+import { Renderer } from "./renderer.js?v=menu-win18";
 import { AudioEngine } from "./audio.js";
 
 export class Game {
@@ -46,9 +46,9 @@ export class Game {
     this.paused = false;
     this.bindUI();
     this.populateRules();
-    this.showScreen("menu");
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+    this.enterMenu();
   }
 
   populateRules() {
@@ -61,6 +61,9 @@ export class Game {
   bindUI() {
     document.getElementById("btn-start").onclick = () => this.beginBriefing(false);
     document.getElementById("btn-rules-preview").onclick = () => this.beginBriefing(true);
+    document.getElementById("btn-menu-quit")?.addEventListener("click", () => this.quitApp());
+    const ver = document.getElementById("menu-version");
+    if (ver) ver.textContent = `v${this.renderer.getGameVersion()}`;
     document.getElementById("btn-letter-next").onclick = () => this.showScreen("intro");
     document.getElementById("btn-intro-next").onclick = () => {
       this.updateRulesButtons();
@@ -72,17 +75,17 @@ export class Game {
         return;
       }
       if (this.briefingOnly) {
-        this.showScreen("menu");
+        this.enterMenu();
         return;
       }
       this.startShift();
     };
-    document.getElementById("btn-rules-back-menu").onclick = () => this.showScreen("menu");
+    document.getElementById("btn-rules-back-menu").onclick = () => this.enterMenu();
     document.getElementById("btn-restart").onclick = () => this.beginBriefing(false);
     document.getElementById("btn-menu").onclick = () => {
       this.playing = false;
       this.paused = false;
-      this.showScreen("menu");
+      this.enterMenu();
     };
 
     document.getElementById("btn-pause").onclick = () => this.pauseGame();
@@ -143,7 +146,7 @@ export class Game {
   }
 
   onPointer(e, click) {
-    this.renderer.setPointer(e.clientX, e.clientY, this.playing && !this.paused);
+    this.renderer.setPointer(e.clientX, e.clientY, this.playing && !this.paused, !!click);
     if (!this.playing || this.paused) {
       this.lookingTable6 = false;
       this.hoverTable6 = false;
@@ -170,10 +173,36 @@ export class Game {
     }
   }
 
+  enterMenu() {
+    this.playing = false;
+    this.paused = false;
+    try {
+      this.renderer.setMenuMode(true);
+    } catch (err) {
+      console.error("[Bella Luna] setMenuMode failed", err);
+    }
+    this.renderer.setSuspended(false);
+    document.getElementById("screen-pause")?.classList.remove("active");
+    this.showScreen("menu");
+  }
+
+  quitApp() {
+    this.audio?.click?.();
+    // En web no hay proceso nativo: mensaje breve.
+    const tip = document.getElementById("menu-quit-tip");
+    if (tip) {
+      tip.classList.remove("hidden");
+      setTimeout(() => tip.classList.add("hidden"), 3200);
+    }
+    try { window.close(); } catch (_) { /* ignore */ }
+  }
+
   beginBriefing(previewOnly) {
     this.briefingOnly = !!previewOnly;
     this.audio?.click?.();
     this.updateRulesButtons();
+    // Mantener la fachada 3D detrás de la carta / reglas.
+    this.renderer.setMenuMode(true);
     this.showScreen("letter");
   }
 
@@ -201,6 +230,7 @@ export class Game {
   pauseGame() {
     if (!this.playing || this.paused) return;
     this.paused = true;
+    this.renderer.setSuspended(true);
     this.setEyesClosed(false);
     this.audio?.click?.();
     // Mantener HUD debajo; la pausa se superpone
@@ -211,6 +241,7 @@ export class Game {
   resumeGame() {
     if (!this.paused) return;
     this.paused = false;
+    this.renderer.setSuspended(false);
     this.audio?.click?.();
     document.getElementById("screen-pause").classList.remove("active");
     this.showScreen("hud");
@@ -225,7 +256,7 @@ export class Game {
     this.hidePhone();
     this.audio?.click?.();
     this.audio?.stopAmbient?.();
-    this.showScreen("menu");
+    this.enterMenu();
   }
 
   async startShift() {
@@ -235,6 +266,8 @@ export class Game {
 
     this.playing = true;
     this.paused = false;
+    this.renderer.setMenuMode(false);
+    this.renderer.setSuspended(false);
     this.timeMinutes = 22 * 60;
     this.fear = 0;
     this.doorLocked = true;
@@ -367,7 +400,7 @@ export class Game {
     this.currentCustomer = customer;
     this.renderer.setCustomer(customer);
     this.showCustomerUI(customer);
-    this.audio.tone(220, 0.1, "triangle", 0.05);
+    this.audio.customerVoice();
     this.showBanner("Alguien se acerca al mostrador…");
   }
 
@@ -509,7 +542,9 @@ export class Game {
   flashBlood() {
     const el = document.getElementById("blood-flash");
     el.classList.add("on");
-    setTimeout(() => el.classList.remove("on"), 200);
+    setTimeout(() => el.classList.remove("on"), 80);
+    setTimeout(() => el.classList.add("on"), 150);
+    setTimeout(() => el.classList.remove("on"), 250);
   }
 
   die(kind, customMsg, customDetail) {

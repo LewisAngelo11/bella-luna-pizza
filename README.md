@@ -7,7 +7,7 @@ Juego web de terror: trabajas el turno de noche en **Bella Luna Pizza**, una piz
 1. Abre `index.html` con un servidor local (módulos ES):
 
 ```bash
-cd pizzeria-medianoche
+cd bella-luna-pizza
 python3 -m http.server 8080
 ```
 
@@ -43,4 +43,44 @@ python3 -m http.server 8080
 
 ## Stack
 
-HTML · CSS · **Three.js** · Web Audio API (sonido procedural) · JavaScript modules
+HTML · CSS · **Babylon.js** · Web Audio API (sonido procedural) · JavaScript modules
+
+### Estructura JS
+
+```
+js/
+  game.js / audio.js / rules.js / main.js
+  renderer.js              → fachada
+  render/
+    Renderer.js            → orquestador + API pública
+    utils.js / materials.js / mesh.js / lights.js / particles.js
+    room/                  → piezas de la sala (shell, window, oven…)
+    actors/                → cliente y jumpscare
+    systems/               → update por frame y calidad adaptativa
+```
+
+### Rendimiento 3D
+
+Perfil ligero: resolución adaptativa, tope ~60 FPS, una sola sombra (512), menos luces dinámicas y texturas 256 px sin bump maps.
+
+#### HUD de rendimiento (dev)
+
+```
+http://localhost:8080/?perf=1
+```
+
+O pulsa **P** en localhost. Muestra FPS, frame/render/GPU ms, draw calls, meshes, luces, shadow casters y geometrías únicas. Al activarse guarda un **baseline** en `sessionStorage` para comparar Δ tras optimizaciones. Off por defecto (sin coste de instrumentación).
+
+#### Fase B (optimización real)
+
+Comparativa aproximada idle (Fase A → B):
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Shadow casters | ~152 | ~13 |
+| Unique geometries | ~190 | ~39 |
+| Draw calls | ~930 | ~200 |
+| Materials | ~79 | ~61 |
+| RenderTargets | ~2.1 ms | ~0.6 ms |
+
+Cambios: casters solo en props grandes, geometría de caja compartida, freeze de estáticos, render 20 FPS en menú/pausa, pausa con pestaña oculta, luces on-demand, update FX ~20 Hz, pick throttled.
