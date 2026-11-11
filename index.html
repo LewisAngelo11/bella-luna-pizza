@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bella Luna Pizza — Turno nocturno</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Special+Elite&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+    <div id="grain"></div>
+    <div id="vignette"></div>
+    <div id="blood-flash"></div>
+
+    <!-- MENÚ -->
+    <section id="screen-menu" class="screen active">
+      <div class="menu-bg"></div>
+      <div class="menu-content">
+        <p class="eyebrow">Turno nocturno · Contrato temporal</p>
+        <h1>BELLA LUNA<br /><span>PIZZA</span></h1>
+        <p class="tagline">
+          El sueldo es bueno. Las reglas son raras.<br />
+          Si las rompes… no habrá segundo turno.
+        </p>
+        <button id="btn-start" class="btn primary">Firmar contrato</button>
+        <button id="btn-rules-preview" class="btn ghost">Leer la carta</button>
+        <p class="hint">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · Sobrevive hasta las 6:00.</p>
+      </div>
+    </section>
+
+    <!-- CARTA DE LA DUEÑA -->
+    <section id="screen-letter" class="screen">
+      <div class="letter">
+        <div class="letter-stamp">Bella Luna</div>
+        <p class="letter-date">Medianoche · Antes de tu primer turno</p>
+        <p class="letter-dear">Querido/a empleado/a,</p>
+        <div class="letter-body">
+          <p>
+            Si estás leyendo esto, aceptaste el turno de noche. Bienvenido a
+            <em>Bella Luna Pizza</em>. El sueldo es generoso porque el trabajo…
+            pide más que amasar harina.
+          </p>
+          <p>
+            Yo no estaré ahí. Nunca lo estoy después de las diez. Pero el local
+            sigue abierto, los clientes llegan, y el horno no debe apagarse.
+          </p>
+          <p>
+            En el cajón del mostrador encontrarás el reglamento. Léelo entero.
+            No son sugerencias. Son la diferencia entre cobrar al amanecer…
+            o no amanecer.
+          </p>
+          <p>
+            Confía en las reglas, no en lo que vean tus ojos. Si algo se siente
+            mal, probablemente lo esté.
+          </p>
+          <p>Que la luna te acompañe.</p>
+        </div>
+        <p class="letter-sign">— Doña Luna<br /><span>Dueña · Bella Luna Pizza</span></p>
+        <button id="btn-letter-next" class="btn primary">Continuar</button>
+      </div>
+    </section>
+
+    <!-- INTRODUCCIÓN -->
+    <section id="screen-intro" class="screen">
+      <div class="paper intro-paper">
+        <p class="eyebrow-ink">Tu primer turno · 22:00 – 06:00</p>
+        <h2>Antes de abrir</h2>
+        <div class="intro-body">
+          <p>
+            Trabajas detrás del mostrador. Atiendes pedidos, vigilas el local
+            y sobrevives hasta las seis.
+          </p>
+          <ul class="intro-list">
+            <li><strong>Mueve el ratón</strong> para mirar alrededor.</li>
+            <li><strong>Click izquierdo</strong> en el congelador o la puerta para interactuar.</li>
+            <li><strong>Click derecho</strong> para girar y ver la puerta trasera.</li>
+            <li><strong>Espacio</strong> cierra los ojos (útil cuando parpadeen las luces).</li>
+            <li><strong>R</strong> abre el reglamento si lo olvidas.</li>
+          </ul>
+          <p class="intro-warn">
+            Habrá clientes normales… y otros que no lo son. Observa. Compara.
+            Recuerda la carta de Doña Luna.
+          </p>
+        </div>
+        <button id="btn-intro-next" class="btn primary">Ver el reglamento</button>
+      </div>
+    </section>
+
+    <!-- REGLAMENTO -->
+    <section id="screen-rules" class="screen">
+      <div class="paper rules-paper">
+        <p class="paper-badge">Documento interno · No sacar del local</p>
+        <h2>REGLAMENTO DE BELLA LUNA PIZZA</h2>
+        <p class="paper-sub">Turno nocturno · Cumplimiento obligatorio</p>
+        <ol id="rules-list"></ol>
+        <p class="paper-footer">
+          «Si algo se siente mal, probablemente lo esté.» — D. Luna
+        </p>
+        <button id="btn-close-rules" class="btn primary">Empezar el turno</button>
+        <button id="btn-rules-back-menu" class="btn ghost hidden">Volver al menú</button>
+      </div>
+    </section>
+
+    <!-- HUD JUEGO -->
+    <section id="screen-hud" class="screen">
+      <button id="btn-pause" class="btn-pause" title="Pausa [Esc]" aria-label="Pausa">❚❚</button>
+
+      <header class="hud-top">
+        <div class="clock-wrap">
+          <span class="clock-label">HORA</span>
+          <span id="clock">22:00</span>
+        </div>
+        <div class="fear-wrap">
+          <span class="fear-label">CORDURA</span>
+          <div class="fear-bar"><div id="fear-fill"></div></div>
+        </div>
+        <div class="shift-wrap">
+          <span id="shift-status">ABIERTO</span>
+        </div>
+      </header>
+
+      <aside id="rules-panel" class="rules-panel">
+        <h3>Reglamento</h3>
+        <ul id="rules-mini"></ul>
+      </aside>
+
+      <div id="event-banner" class="event-banner hidden"></div>
+
+      <div id="customer-panel" class="customer-panel hidden">
+        <div class="customer-info">
+          <p id="customer-desc"></p>
+          <p id="customer-order" class="order"></p>
+        </div>
+        <div id="action-buttons" class="actions"></div>
+      </div>
+
+      <div id="phone-ui" class="phone-ui hidden">
+        <p>☎ El teléfono suena… <span id="ring-count">1</span></p>
+        <button data-phone="answer" class="btn small">Contestar</button>
+        <button data-phone="hang" class="btn small danger">Colgar</button>
+      </div>
+
+      <footer class="hud-bottom">
+        <button id="btn-toggle-rules" class="btn small ghost">Reglamento [R]</button>
+        <button id="btn-check-freezer" class="btn small">Congelador [F / click]</button>
+        <button id="btn-lock-door" class="btn small">Puerta [D / click]</button>
+        <button id="btn-look-back" class="btn small ghost">Mirar atrás [Click der.]</button>
+        <button id="btn-close-eyes" class="btn small">Cerrar ojos [Espacio]</button>
+        <span id="ambient-note"></span>
+      </footer>
+
+      <div id="eyes-closed" class="eyes-closed hidden">
+        <p>Ojos cerrados…</p>
+      </div>
+    </section>
+
+    <!-- PAUSA -->
+    <section id="screen-pause" class="screen">
+      <div class="pause-card">
+        <p class="pause-eyebrow">Turno en pausa</p>
+        <h2>PAUSA</h2>
+        <p class="pause-hint">El reloj se detiene. La pizzería… también. Por ahora.</p>
+        <button id="btn-resume" class="btn primary">Reanudar</button>
+        <button id="btn-pause-quit" class="btn ghost">Salir</button>
+      </div>
+    </section>
+
+    <!-- GAME OVER / WIN -->
+    <section id="screen-end" class="screen">
+      <div class="end-card">
+        <h2 id="end-title">Fin del turno</h2>
+        <p id="end-message"></p>
+        <p id="end-detail" class="end-detail"></p>
+        <button id="btn-restart" class="btn primary">Intentar otro turno</button>
+        <button id="btn-menu" class="btn ghost">Menú principal</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
