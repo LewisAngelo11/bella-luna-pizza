@@ -49,7 +49,10 @@ export class Game {
     this.phoneTimer = 0;
     this.phoneNextIn = 45;
     this.eventCooldown = 0;
-    this.bannerTimer = 0;
+    this.warnBanner = { timer: 0, zone: null, eventId: null };
+    this.warnQueue = [];
+    this.infoBannerTimer = 0;
+    this.infoBannerKind = null; // "view" | "info"
     this.servedCount = 0;
     this.refusedCount = 0;
     this.hoverTable6 = false;
@@ -136,7 +139,7 @@ export class Game {
       const behind = this.renderer.toggleLookingBehind();
       this.syncBehindControls(behind);
       this.audio.click();
-      this.showBanner(behind ? "Mirando hacia la cocina / puerta trasera." : "Mirando la sala.");
+      this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
     };
     document.getElementById("btn-close-eyes").onmousedown = () => this.setEyesClosed(true);
     document.getElementById("btn-close-eyes").onmouseup = () => this.setEyesClosed(false);
@@ -176,11 +179,7 @@ export class Game {
       const behind = this.renderer.toggleLookingBehind();
       this.syncBehindControls(behind);
       this.audio.click();
-      this.showBanner(
-        behind
-          ? "Vista a la cocina."
-          : "Vista al comedor."
-      );
+      this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
     });
   }
 
@@ -224,7 +223,7 @@ export class Game {
       return;
     }
     if (target === "table6") {
-      this.showBanner("Estás mirando la Mesa 6…");
+      this.showInfo("Estás mirando la Mesa 6…");
     }
   }
 
@@ -350,7 +349,12 @@ export class Game {
     this.phoneTimer = 0;
     this.phoneNextIn = 50 + Math.random() * 40;
     this.eventCooldown = 0;
-    this.bannerTimer = 0;
+    this.warnBanner = { timer: 0, zone: null, eventId: null };
+    this.warnQueue = [];
+    this.infoBannerTimer = 0;
+    this.infoBannerKind = null;
+    this.hideWarningBanner();
+    this.hideInfoBanner();
     this.servedCount = 0;
     this.refusedCount = 0;
     this.renderer.setCustomer(null);
@@ -361,7 +365,7 @@ export class Game {
     this.updateFearUI();
     this.updateClockUI();
     this.showScreen("hud");
-    this.showBanner("Turno iniciado. Click: congelador / horno / puerta. Click derecho: mirar atrás.");
+    this.showInfo("Turno iniciado. Click: congelador / horno / puerta. Click derecho: mirar atrás.", 4);
   }
 
   toggleRulesPanel() {
@@ -391,7 +395,7 @@ export class Game {
     this.renderer.setFreezerOpen(this.freezerOpen);
 
     if (this.freezerOpen) {
-      this.showBanner(
+      this.showInfo(
         fromClick
           ? "Abres el congelador. Escarcha, paquetes… y un silencio demasiado denso."
           : "Abres el congelador. [F] o click para cerrar."
@@ -404,9 +408,10 @@ export class Game {
         this.freezerAutoTimer = 0;
         this.freezerAutoCloseIn = -1;
         this.freezerAutoNextIn = this.nextFreezerAutoDelay();
-        this.showBanner("Cierras el congelador a tiempo. El frío se queda dentro.");
+        this.clearWarningEvent("freezer_auto");
+        this.showInfo("Cierras el congelador a tiempo. El frío se queda dentro.");
       } else {
-        this.showBanner("Cierras el congelador. Mejor así.");
+        this.showInfo("Cierras el congelador. Mejor así.");
       }
       this.addFear(-1);
     }
@@ -422,7 +427,8 @@ export class Game {
       this.ovenOffDeadline = 0;
       this.ovenEventTimer = this.nextOvenDelay();
       this.renderer.setOvenOn(true);
-      this.showBanner(
+      this.clearWarningEvent("oven_off");
+      this.showInfo(
         fromClick
           ? "Reavivas las brasas. El horno vuelve a respirar."
           : "Enciendes el horno."
@@ -435,7 +441,8 @@ export class Game {
     this.ovenOn = false;
     this.ovenOffDeadline = 0;
     this.renderer.setOvenOn(false);
-    this.showBanner("Apagas el horno. Puedes volver a encenderlo con [H] o click.");
+    this.clearWarningEvent("oven_off");
+    this.showInfo("Apagas el horno. Puedes volver a encenderlo con [H] o click.");
   }
 
   toggleDoor() {
@@ -449,18 +456,156 @@ export class Game {
       if (hour >= 2 && hour < 6) {
         this.doorAutoNextIn = this.nextDoorAutoDelay(true);
       }
-      this.showBanner("Cierras la puerta trasera y echas el cerrojo.");
+      this.clearWarningEvent("door_open");
+      this.showInfo("Cierras la puerta trasera y echas el cerrojo.");
     } else {
       this.eventCooldown = 0;
-      this.showBanner("Abres la puerta trasera. La noche se siente más cerca.");
+      this.showInfo("Abres la puerta trasera. La noche se siente más cerca.");
     }
   }
 
-  showBanner(text, dur = 3.2) {
-    const el = document.getElementById("event-banner");
+  /**
+   * Info de vista (cocina/comedor): prioridad más baja y estilo tenue.
+   * No reemplaza un info normal que aún esté visible.
+   */
+  showViewInfo(text, dur = 2.2) {
+    if (this.infoBannerTimer > 0 && this.infoBannerKind === "info") return;
+    this._setInfoBanner(text, dur, "view");
+  }
+
+  /** Aviso informativo (arriba derecha): puede coexistir con advertencias. */
+  showInfo(text, dur = 2.8) {
+    this._setInfoBanner(text, dur, "info");
+  }
+
+  _setInfoBanner(text, dur, kind) {
+    const el = document.getElementById("info-banner");
+    if (!el) return;
     el.textContent = text;
+    el.classList.toggle("is-view", kind === "view");
     el.classList.remove("hidden");
-    this.bannerTimer = dur;
+    this.infoBannerTimer = dur;
+    this.infoBannerKind = kind;
+  }
+
+  hideInfoBanner() {
+    const el = document.getElementById("info-banner");
+    el?.classList.add("hidden");
+    el?.classList.remove("is-view");
+    this.infoBannerTimer = 0;
+    this.infoBannerKind = null;
+  }
+
+  /**
+   * Advertencia urgente. No interrumpe otra advertencia activa: entra en cola.
+   * zone: "kitchen" | "front"
+   * eventId + isActive: si el jugador ya resolvió el evento, no se muestra al salir de cola.
+   */
+  showWarning(text, { zone = "front", eventId = null, isActive = null, dur = 3.2 } = {}) {
+    const item = {
+      text,
+      zone,
+      eventId,
+      dur,
+      isActive: typeof isActive === "function" ? isActive : () => true,
+    };
+
+    // Misma advertencia ya visible: no la reinicia ni la vuelve a encolar
+    if (eventId && this.warnBanner.timer > 0 && this.warnBanner.eventId === eventId) {
+      return;
+    }
+
+    if (this.warnBanner.timer > 0) {
+      this.enqueueWarning(item);
+      return;
+    }
+
+    this.displayWarning(item);
+  }
+
+  enqueueWarning(item) {
+    if (item.eventId) {
+      const existing = this.warnQueue.find((q) => q.eventId === item.eventId);
+      if (existing) {
+        existing.text = item.text;
+        existing.zone = item.zone;
+        existing.dur = item.dur;
+        existing.isActive = item.isActive;
+        return;
+      }
+    }
+    this.warnQueue.push(item);
+  }
+
+  displayWarning(item) {
+    const el = document.getElementById("event-banner");
+    if (!el) return;
+    el.textContent = item.text;
+    el.classList.remove("hidden");
+    this.warnBanner.timer = item.dur;
+    this.warnBanner.zone = item.zone;
+    this.warnBanner.eventId = item.eventId;
+  }
+
+  hideWarningBanner() {
+    document.getElementById("event-banner")?.classList.add("hidden");
+    this.warnBanner.timer = 0;
+    this.warnBanner.zone = null;
+    this.warnBanner.eventId = null;
+  }
+
+  /** Quita de la cola (y del banner activo) un evento ya resuelto. */
+  clearWarningEvent(eventId) {
+    if (!eventId) return;
+    this.warnQueue = this.warnQueue.filter((q) => q.eventId !== eventId);
+    if (this.warnBanner.eventId === eventId) {
+      this.hideWarningBanner();
+      this.tryShowNextWarning();
+    }
+  }
+
+  /** Zona preferida = la que el jugador NO está mirando. */
+  preferredWarningZone() {
+    return this.isLookingBehind() ? "front" : "kitchen";
+  }
+
+  pickNextWarning() {
+    this.warnQueue = this.warnQueue.filter((q) => {
+      try {
+        return q.isActive();
+      } catch {
+        return false;
+      }
+    });
+    if (!this.warnQueue.length) return null;
+
+    const preferred = this.preferredWarningZone();
+    const idx = this.warnQueue.findIndex((q) => q.zone === preferred);
+    if (idx >= 0) return this.warnQueue.splice(idx, 1)[0];
+    return this.warnQueue.shift();
+  }
+
+  tryShowNextWarning() {
+    if (this.warnBanner.timer > 0) return;
+    const next = this.pickNextWarning();
+    if (next) this.displayWarning(next);
+  }
+
+  updateBanners(dt) {
+    if (this.infoBannerTimer > 0) {
+      this.infoBannerTimer -= dt;
+      if (this.infoBannerTimer <= 0) this.hideInfoBanner();
+    }
+
+    if (this.warnBanner.timer > 0) {
+      this.warnBanner.timer -= dt;
+      if (this.warnBanner.timer <= 0) {
+        this.hideWarningBanner();
+        this.tryShowNextWarning();
+      }
+    } else {
+      this.tryShowNextWarning();
+    }
   }
 
   hideCustomerPanel() {
@@ -522,7 +667,7 @@ export class Game {
     this.renderer.setCustomer(customer);
     this.showCustomerUI(customer);
     this.audio.customerEnter();
-    this.showBanner(
+    this.showInfo(
       witching
         ? "Algo entra… no parece un cliente cualquiera."
         : "Alguien se acerca al mostrador…"
@@ -561,11 +706,11 @@ export class Game {
     if (ok) {
       if (action === "refuse" || action === "serve_lookaway" || action === "serve_garlic") {
         this.refusedCount++;
-        this.showBanner(c.anomaly ? "Hiciste lo correcto. Se va… despacio." : "Pedido atendido.");
+        this.showInfo(c.anomaly ? "Hiciste lo correcto. Se va… despacio." : "Pedido atendido.");
         this.addFear(-3);
       } else {
         this.servedCount++;
-        this.showBanner("Pedido servido. El horno crepita.");
+        this.showInfo("Pedido servido. El horno crepita.");
         this.addFear(-2);
       }
       this.clearCustomer();
@@ -573,7 +718,7 @@ export class Game {
       if (c.anomaly && c.wrongDeath) {
         this.die("customer", c.wrongDeath, `Regla relacionada: ${c.ruleBroken || "juicio"}`);
       } else {
-        this.showBanner("Eso no era lo que pedían… sientes que algo se tensa en el aire.");
+        this.showInfo("Eso no era lo que pedían… sientes que algo se tensa en el aire.");
         this.addFear(18);
         this.flashBlood();
         this.clearCustomer();
@@ -597,7 +742,7 @@ export class Game {
     document.getElementById("phone-ui").classList.remove("hidden");
     document.getElementById("ring-count").textContent = "1";
     this.audio.ring();
-    this.showBanner("El teléfono del mostrador…");
+    this.showInfo("El teléfono del mostrador…");
   }
 
   handlePhone(action) {
@@ -608,7 +753,7 @@ export class Game {
     // Regla: 2 timbres → contestar; 3 → colgar
     if (action === "answer") {
       if (rings === 2) {
-        this.showBanner("Una voz lejana: «Gracias por respetar las reglas.» Cuelga.");
+        this.showInfo("Una voz lejana: «Gracias por respetar las reglas.» Cuelga.");
         this.addFear(-4);
         this.endPhone();
       } else {
@@ -616,7 +761,7 @@ export class Game {
       }
     } else if (action === "hang") {
       if (rings === 3) {
-        this.showBanner("Cuelgas a tiempo. El silencio es una bendición.");
+        this.showInfo("Cuelgas a tiempo. El silencio es una bendición.");
         this.addFear(-3);
         this.endPhone();
       } else {
@@ -785,10 +930,16 @@ export class Game {
         return;
       }
       if (this.table6Timer > 1.5) {
-        this.showBanner('Algo raro se ve en la mesa 6…');
+        this.showWarning("Algo raro se ve en la mesa 6…", {
+          zone: "front",
+          eventId: "table6",
+          isActive: () => this.lookingTable6 && this.table6Timer > 1.5,
+          dur: 2.2,
+        });
       }
     } else {
       this.table6Timer = Math.max(0, this.table6Timer - dt * 1.5);
+      this.clearWarningEvent("table6");
     }
 
     // Puerta trasera después de 02:00
@@ -810,7 +961,11 @@ export class Game {
             this.audio.noiseBurst?.(0.25, 0.07, {
               freq: 220, filter: "lowpass", color: "brown",
             });
-            this.showBanner("La puerta trasera está abierta");
+            this.showWarning("La puerta trasera está abierta", {
+              zone: "kitchen",
+              eventId: "door_open",
+              isActive: () => !this.doorLocked,
+            });
           }
         }
       }
@@ -836,7 +991,11 @@ export class Game {
         this.ovenOffDeadline = 5;
         this.renderer.setOvenOn(false);
         this.audio.noiseBurst?.(0.35, 0.1, { freq: 180, filter: "lowpass", color: "brown" });
-        this.showBanner("¡El horno se apagó!");
+        this.showWarning("¡El horno se apagó!", {
+          zone: "kitchen",
+          eventId: "oven_off",
+          isActive: () => !this.ovenOn && this.ovenOffDeadline > 0,
+        });
       }
     } else if (!this.ovenOn && this.ovenOffDeadline > 0) {
       this.ovenOffDeadline -= dt;
@@ -856,10 +1015,15 @@ export class Game {
         this.freezerAutoTimer = 5;
         this.freezerAutoCloseIn = Math.random() < 0.55 ? 1.2 + Math.random() * 3.5 : -1;
         this.audio.noiseBurst?.(0.2, 0.08, { freq: 320, filter: "bandpass", Q: 2, color: "pink" });
-        this.showBanner(
+        this.showWarning(
           this.freezerAutoCloseIn > 0
             ? "El congelador se abrió solo…"
-            : "El congelador se abrió solo. No se ve que vaya a cerrarse…"
+            : "El congelador se abrió solo. No se ve que vaya a cerrarse…",
+          {
+            zone: "front",
+            eventId: "freezer_auto",
+            isActive: () => !!this.freezerAutoPhase && this.freezerOpen,
+          }
         );
       }
     } else if (this.freezerAutoPhase === "grace") {
@@ -873,13 +1037,18 @@ export class Game {
           this.freezerAutoTimer = 0;
           this.freezerAutoCloseIn = -1;
           this.freezerAutoNextIn = this.nextFreezerAutoDelay();
-          this.showBanner("El congelador se cerró solo. Por ahora.");
+          this.clearWarningEvent("freezer_auto");
+          this.showInfo("El congelador se cerró solo. Por ahora.");
         }
       }
       if (this.freezerAutoPhase === "grace" && this.freezerAutoTimer <= 0 && this.freezerOpen) {
         this.freezerAutoPhase = "must_close";
         this.freezerAutoTimer = 5;
-        this.showBanner("¡El congelador sigue abierto!");
+        this.showWarning("¡El congelador sigue abierto!", {
+          zone: "front",
+          eventId: "freezer_auto",
+          isActive: () => this.freezerAutoPhase === "must_close" && this.freezerOpen,
+        });
       }
     } else if (this.freezerAutoPhase === "must_close") {
       this.freezerAutoTimer -= dt;
@@ -899,7 +1068,11 @@ export class Game {
         }
         this.freezerKnock = true;
         this._knockLeft = 8 + Math.random() * 6;
-        this.showBanner("…golpes sordos desde el congelador.");
+        this.showWarning("…golpes sordos desde el congelador.", {
+          zone: "front",
+          eventId: "freezer_knock",
+          isActive: () => this.freezerKnock,
+        });
         this.audio.knock();
       }
     } else if (this.freezerKnock) {
@@ -910,7 +1083,8 @@ export class Game {
         this.freezerKnockTimer = this.isWitchingHour()
           ? 12 + Math.random() * 18
           : 40 + Math.random() * 50;
-        this.showBanner("Los golpes cesan. No abras esa puerta.");
+        this.clearWarningEvent("freezer_knock");
+        this.showInfo("Los golpes cesan. No abras esa puerta.");
       }
     }
 
@@ -921,7 +1095,11 @@ export class Game {
         this.flickerIntensity = 1;
         this.eyesClosedNeeded = true;
         this._flickerLeft = 3.5 + Math.random() * 1.5;
-        this.showBanner("Las luces parpadean. Cierra los ojos.");
+        this.showWarning("Las luces parpadean. Cierra los ojos.", {
+          zone: "front",
+          eventId: "flicker",
+          isActive: () => this.flickerIntensity > 0,
+        });
         this.audio.noiseBurst(0.15, 0.1);
       }
     }
@@ -941,7 +1119,8 @@ export class Game {
         this.eyesClosedNeeded = false;
         this._flickerUnsafe = 0;
         this.flickerTimer = this.nextFlickerDelay();
-        if (this.eyesClosed) this.showBanner("Las luces se estabilizan. Puedes abrir los ojos.");
+        this.clearWarningEvent("flicker");
+        if (this.eyesClosed) this.showInfo("Las luces se estabilizan. Puedes abrir los ojos.");
       }
     }
 
@@ -977,12 +1156,7 @@ export class Game {
       this.dripTimer = 2 + Math.random() * 5;
     }
 
-    if (this.bannerTimer > 0) {
-      this.bannerTimer -= dt;
-      if (this.bannerTimer <= 0) {
-        document.getElementById("event-banner").classList.add("hidden");
-      }
-    }
+    this.updateBanners(dt);
 
     const note = document.getElementById("ambient-note");
     if (!this.ovenOn && this.ovenOffDeadline > 0) {

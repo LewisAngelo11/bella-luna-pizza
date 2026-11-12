@@ -631,9 +631,10 @@ body:has(#screen-menu.active) #vignette {
   margin-left: 1rem;
 }
 
-.event-banner {
+.event-banner,
+.warning-banner {
   position: absolute;
-  top: 22%;
+  top: 20%;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(10,4,4,0.88);
@@ -645,9 +646,46 @@ body:has(#screen-menu.active) #vignette {
   text-align: center;
   max-width: 90vw;
   box-shadow: 0 0 30px rgba(180,20,10,0.25);
+  /* Por encima de #eyes-closed: deben leerse con los ojos “cerrados” */
+  z-index: 16;
 }
 
-.event-banner.hidden {
+.event-banner.hidden,
+.warning-banner.hidden {
+  display: none;
+}
+
+/* Avisos informativos: esquina superior derecha (no tapan el centro) */
+.info-banner {
+  position: absolute;
+  top: 4.75rem;
+  right: 1.25rem;
+  left: auto;
+  transform: none;
+  background: transparent;
+  border: none;
+  color: rgba(236, 236, 236, 0.9);
+  padding: 0.25rem 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.035em;
+  text-align: right;
+  max-width: min(280px, 42vw);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  /* Por encima de #eyes-closed (infos + vista) */
+  z-index: 16;
+  pointer-events: none;
+}
+
+/* Vista cocina/comedor: gris tenue, mínima distracción */
+.info-banner.is-view {
+  color: rgba(170, 170, 170, 0.55);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.info-banner.hidden {
   display: none;
 }
 
