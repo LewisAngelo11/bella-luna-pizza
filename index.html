@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bella Luna Pizza — Turno nocturno</title>
+  <link rel="icon" type="image/png" href="assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Special+Elite&display=swap" rel="stylesheet" />
@@ -18,6 +20,7 @@
 </head>
 <body>
   <div id="app">
+    <canvas id="menu-canvas" aria-hidden="true"></canvas>
     <canvas id="game"></canvas>
     <div id="grain"></div>
     <div id="vignette"></div>
@@ -25,17 +28,19 @@
 
     <!-- MENÚ -->
     <section id="screen-menu" class="screen active">
-      <div class="menu-bg"></div>
       <div class="menu-content">
         <p class="eyebrow">Turno nocturno · Contrato temporal</p>
         <h1>BELLA LUNA<br /><span>PIZZA</span></h1>
         <p class="tagline">
-          El sueldo es bueno. Las reglas son raras.<br />
-          Si las rompes… no habrá segundo turno.
+          Se contrata personal en el turno nocturno.<br />
+          Horario: 22:00 – 06:00
         </p>
-        <button id="btn-start" class="btn primary">Firmar contrato</button>
-        <button id="btn-rules-preview" class="btn ghost">Leer la carta</button>
-        <p class="hint">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · Sobrevive hasta las 6:00.</p>
+        <div class="menu-actions">
+          <button id="btn-start" class="btn primary">JUGAR</button>
+          <button id="btn-rules-preview" class="btn ghost">INSTRUCCIONES</button>
+        </div>
+        <p class="hint">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · H: horno · F: congelador · Sobrevive hasta las 6:00.</p>
+        <p class="menu-version" id="menu-version"></p>
       </div>
     </section>
 
@@ -64,9 +69,9 @@
             Confía en las reglas, no en lo que vean tus ojos. Si algo se siente
             mal, probablemente lo esté.
           </p>
-          <p>Que la luna te acompañe.</p>
+          <p>Que la suerte te acompañe.</p>
         </div>
-        <p class="letter-sign">— Doña Luna<br /><span>Dueña · Bella Luna Pizza</span></p>
+        <p class="letter-sign">— Señorita Luna<br /><span>Dueña · Bella Luna Pizza</span></p>
         <button id="btn-letter-next" class="btn primary">Continuar</button>
       </div>
     </section>
@@ -79,18 +84,18 @@
         <div class="intro-body">
           <p>
             Trabajas detrás del mostrador. Atiendes pedidos, vigilas el local
-            y sobrevives hasta las seis.
+            y terminas hasta las seis.
           </p>
           <ul class="intro-list">
             <li><strong>Mueve el ratón</strong> para mirar alrededor.</li>
-            <li><strong>Click izquierdo</strong> en el congelador o la puerta para interactuar.</li>
-            <li><strong>Click derecho</strong> para girar y ver la puerta trasera.</li>
+            <li><strong>Click izquierdo</strong> en el congelador (sala) para interactuar.</li>
+            <li><strong>Click derecho</strong> para girar: ahí están el horno [H] y la puerta trasera [D].</li>
             <li><strong>Espacio</strong> cierra los ojos (útil cuando parpadeen las luces).</li>
             <li><strong>R</strong> abre el reglamento si lo olvidas.</li>
           </ul>
           <p class="intro-warn">
             Habrá clientes normales… y otros que no lo son. Observa. Compara.
-            Recuerda la carta de Doña Luna.
+            Recuerda la carta de la Dueña.
           </p>
         </div>
         <button id="btn-intro-next" class="btn primary">Ver el reglamento</button>
@@ -154,7 +159,8 @@
       <footer class="hud-bottom">
         <button id="btn-toggle-rules" class="btn small ghost">Reglamento [R]</button>
         <button id="btn-check-freezer" class="btn small">Congelador [F / click]</button>
-        <button id="btn-lock-door" class="btn small">Puerta [D / click]</button>
+        <button id="btn-toggle-oven" class="btn small hidden">Horno [H / click]</button>
+        <button id="btn-lock-door" class="btn small hidden">Puerta [D / click]</button>
         <button id="btn-look-back" class="btn small ghost">Mirar atrás [Click der.]</button>
         <button id="btn-close-eyes" class="btn small">Cerrar ojos [Espacio]</button>
         <span id="ambient-note"></span>

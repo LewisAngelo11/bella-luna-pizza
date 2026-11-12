@@ -40,6 +40,8 @@ html, body {
   height: 100%;
   display: block;
   background: #050302;
+  z-index: 0;
+  transition: opacity 0.35s ease;
 }
 
 #grain {
@@ -69,13 +71,24 @@ html, body {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, rgba(180,0,0,0.55), transparent 70%);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(160, 0, 0, 0.55), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(40, 0, 20, 0.25), transparent 70%);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.12s;
 }
 
 #blood-flash.on {
   opacity: 1;
+  animation: scare-shake 0.45s linear;
+}
+
+@keyframes scare-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-8px, 4px); }
+  40% { transform: translate(10px, -6px); }
+  60% { transform: translate(-6px, -3px); }
+  80% { transform: translate(7px, 5px); }
 }
 
 .screen {
@@ -89,32 +102,91 @@ html, body {
   display: flex;
 }
 
-/* —— MENÚ —— */
-#screen-menu {
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(160deg, rgba(8,4,3,0.55), rgba(20,6,4,0.85));
-}
-
-.menu-bg {
+/* —— MENÚ (UI izquierda · escena 3D derecha) —— */
+#menu-canvas {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at 70% 40%, rgba(232,93,4,0.25), transparent 50%),
-    radial-gradient(ellipse at 20% 80%, rgba(139,26,26,0.35), transparent 45%);
-  animation: pulse-glow 4s ease-in-out infinite;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+#screen-menu {
+  align-items: stretch;
+  justify-content: flex-start;
+  background: linear-gradient(
+    90deg,
+    rgba(6, 4, 8, 0.82) 0%,
+    rgba(6, 4, 8, 0.55) 38%,
+    rgba(6, 4, 8, 0.12) 58%,
+    transparent 72%
+  );
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* En el menú, suavizar viñeta para no comerse luna/pinos a la derecha */
+body:has(#screen-menu.active) #vignette {
+  background: radial-gradient(ellipse at 38% 45%, transparent 42%, rgba(0,0,0,0.45) 100%);
+}
+
+#screen-menu.active {
+  pointer-events: none;
+}
+
+#screen-menu .menu-content,
+#screen-menu .btn {
+  pointer-events: auto;
 }
 
 .menu-content {
   position: relative;
-  text-align: center;
-  max-width: 640px;
-  padding: 2rem;
+  align-self: center;
+  text-align: left;
+  max-width: min(440px, 92vw);
+  padding: 2rem 1.5rem 2rem 6vw;
+  z-index: 2;
+}
+
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.menu-actions .btn {
+  margin: 0;
+  min-width: 8.5rem;
+}
+
+.menu-version {
+  margin-top: 1.75rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: rgba(160, 140, 120, 0.45);
+}
+
+@media (max-width: 720px) {
+  #screen-menu {
+    background: linear-gradient(
+      180deg,
+      rgba(6, 4, 8, 0.75) 0%,
+      rgba(6, 4, 8, 0.35) 45%,
+      transparent 70%
+    );
+    align-items: flex-start;
+  }
+
+  .menu-content {
+    padding: 1.5rem 1.25rem;
+    max-width: 100%;
+  }
 }
 
 .eyebrow {
@@ -461,7 +533,8 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 1rem 1.25rem;
+  /* reserva espacio a la derecha para el botón de pausa */
+  padding: 1rem 4.25rem 1rem 1.25rem;
   gap: 1rem;
   background: linear-gradient(180deg, rgba(0,0,0,0.65), transparent);
 }
@@ -471,6 +544,10 @@ html, body {
   border: 1px solid rgba(232,180,120,0.2);
   padding: 0.55rem 0.85rem;
   backdrop-filter: blur(6px);
+}
+
+.shift-wrap {
+  flex-shrink: 0;
 }
 
 .clock-label, .fear-label {
@@ -510,6 +587,7 @@ html, body {
   color: var(--neon);
   text-shadow: 0 0 10px rgba(255,59,59,0.6);
   letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 .rules-panel {

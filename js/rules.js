@@ -39,7 +39,15 @@ export const RULES = [
   },
   {
     id: "door",
-    text: "Después de las 02:00, la puerta trasera debe permanecer cerrada con llave.",
+    text: "Después de las 02:00, la puerta trasera debe permanecer cerrada con llave. Si se abre, ciérrala de inmediato.",
+  },
+  {
+    id: "oven",
+    text: "El horno no debe apagarse. Si se apaga solo, enciéndelo de inmediato.",
+  },
+  {
+    id: "freezer_auto",
+    text: "Si el congelador se abre solo, puede cerrarse solo… o no. Si no lo hace, ciérralo tú antes de cinco segundos.",
   },
 ];
 
@@ -164,6 +172,16 @@ export const DEATHS = {
     title: "Puerta trasera",
     message: "A las 02:00 algo empujó desde fuera. La cerradura no estaba echada.",
     detail: "Regla rota: puerta trasera cerrada después de las 02:00.",
+  },
+  oven_cold: {
+    title: "Horno frío",
+    message: "Las brasas murieron. En la oscuridad del horno algo más encontró calor… en ti.",
+    detail: "Regla rota: el horno no debe apagarse.",
+  },
+  freezer_ajar: {
+    title: "Abierto",
+    message: "El congelador quedó entreabierto demasiado tiempo. La escarcha aprendió tu nombre.",
+    detail: "Regla rota: si el congelador se abre solo, ciérralo a tiempo.",
   },
   fear: {
     title: "Ruptura",

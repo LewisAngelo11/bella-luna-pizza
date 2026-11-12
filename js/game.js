@@ -7,21 +7,35 @@ import {
 } from "./rules.js";
 import { Renderer } from "./renderer.js";
 import { AudioEngine } from "./audio.js";
+import { MenuScene, VERSION as MENU_VERSION } from "./menu/MenuScene.js";
 
 export class Game {
   constructor() {
     this.canvas = document.getElementById("game");
+    this.menuCanvas = document.getElementById("menu-canvas");
     this.renderer = new Renderer(this.canvas);
+    this.menuScene = new MenuScene(this.menuCanvas);
     this.audio = new AudioEngine();
+
+    const ver = document.getElementById("menu-version");
+    if (ver) ver.textContent = MENU_VERSION;
 
     this.playing = false;
     this.timeMinutes = 22 * 60; // 22:00
     this.endMinutes = 6 * 60 + 24 * 60; // 06:00 next day as absolute
     this.fear = 0; // 0 = sane, 100 = break
     this.doorLocked = true;
+    this.doorAutoNextIn = 0;
     this.freezerOpen = false;
     this.freezerKnock = false;
     this.freezerKnockTimer = 0;
+    this.freezerAutoPhase = null; // null | "grace" | "must_close"
+    this.freezerAutoTimer = 0;
+    this.freezerAutoCloseIn = -1;
+    this.freezerAutoNextIn = 0;
+    this.ovenOn = true;
+    this.ovenOffDeadline = 0;
+    this.ovenEventTimer = 0;
     this.lookingTable6 = false;
     this.table6Timer = 0;
     this.flickerIntensity = 0;
@@ -47,8 +61,27 @@ export class Game {
     this.bindUI();
     this.populateRules();
     this.showScreen("menu");
+    this.menuScene.setActive(true);
+    this._bindMenuAmbienceUnlock();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  /** Ambientación nocturna también en menú (requiere gesto del usuario). */
+  async ensureAmbience() {
+    await this.audio.init();
+    this.audio.resume();
+    this.audio.startAmbience();
+  }
+
+  _bindMenuAmbienceUnlock() {
+    const unlock = () => {
+      this.ensureAmbience();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
   }
 
   populateRules() {
@@ -60,9 +93,13 @@ export class Game {
 
   bindUI() {
     document.getElementById("btn-start").onclick = () => this.beginBriefing(false);
-    document.getElementById("btn-rules-preview").onclick = () => this.beginBriefing(true);
+    document.getElementById("btn-rules-preview").onclick = () => this.showInstructions();
     document.getElementById("btn-letter-next").onclick = () => this.showScreen("intro");
     document.getElementById("btn-intro-next").onclick = () => {
+      if (this.briefingOnly) {
+        this.showScreen("menu");
+        return;
+      }
       this.updateRulesButtons();
       this.showScreen("rules");
     };
@@ -82,6 +119,7 @@ export class Game {
     document.getElementById("btn-menu").onclick = () => {
       this.playing = false;
       this.paused = false;
+      this.ensureAmbience();
       this.showScreen("menu");
     };
 
@@ -91,12 +129,14 @@ export class Game {
 
     document.getElementById("btn-toggle-rules").onclick = () => this.toggleRulesPanel();
     document.getElementById("btn-check-freezer").onclick = () => this.checkFreezer();
+    document.getElementById("btn-toggle-oven").onclick = () => this.toggleOven();
     document.getElementById("btn-lock-door").onclick = () => this.toggleDoor();
     document.getElementById("btn-look-back").onclick = () => {
       if (!this.playing) return;
       const behind = this.renderer.toggleLookingBehind();
+      this.syncBehindControls(behind);
       this.audio.click();
-      this.showBanner(behind ? "Mirando hacia la puerta trasera." : "Mirando la sala.");
+      this.showBanner(behind ? "Mirando hacia la cocina / puerta trasera." : "Mirando la sala.");
     };
     document.getElementById("btn-close-eyes").onmousedown = () => this.setEyesClosed(true);
     document.getElementById("btn-close-eyes").onmouseup = () => this.setEyesClosed(false);
@@ -115,8 +155,9 @@ export class Game {
       }
       if (!this.playing || this.paused) return;
       if (e.code === "KeyR") this.toggleRulesPanel();
-      if (e.code === "KeyF") this.checkFreezer();
-      if (e.code === "KeyD") this.toggleDoor();
+      if (e.code === "KeyF" && !this.isLookingBehind()) this.checkFreezer();
+      if (e.code === "KeyH" && this.isLookingBehind()) this.toggleOven();
+      if (e.code === "KeyD" && this.isLookingBehind()) this.toggleDoor();
       if (e.code === "Space") {
         e.preventDefault();
         this.setEyesClosed(true);
@@ -133,13 +174,26 @@ export class Game {
       e.preventDefault();
       if (!this.playing) return;
       const behind = this.renderer.toggleLookingBehind();
+      this.syncBehindControls(behind);
       this.audio.click();
       this.showBanner(
         behind
-          ? "Te giras. La puerta trasera queda frente a ti. [Click o D]"
-          : "Vuelves a mirar la sala."
+          ? "Vista a la cocina."
+          : "Vista al comedor."
       );
     });
+  }
+
+  /** Cocina atrás: horno/puerta. Sala al frente: congelador. */
+  syncBehindControls(behind = this.renderer?.lookingBehind) {
+    const on = !!behind;
+    document.getElementById("btn-toggle-oven")?.classList.toggle("hidden", !on);
+    document.getElementById("btn-lock-door")?.classList.toggle("hidden", !on);
+    document.getElementById("btn-check-freezer")?.classList.toggle("hidden", on);
+  }
+
+  isLookingBehind() {
+    return !!this.renderer?.lookingBehind;
   }
 
   onPointer(e, click) {
@@ -158,11 +212,15 @@ export class Game {
 
     const target = this.renderer.getHoverTarget();
     if (target === "freezer") {
-      this.checkFreezer(true);
+      if (!this.isLookingBehind()) this.checkFreezer(true);
+      return;
+    }
+    if (target === "oven") {
+      if (this.isLookingBehind()) this.toggleOven(true);
       return;
     }
     if (target === "door") {
-      this.toggleDoor();
+      if (this.isLookingBehind()) this.toggleDoor();
       return;
     }
     if (target === "table6") {
@@ -172,18 +230,36 @@ export class Game {
 
   beginBriefing(previewOnly) {
     this.briefingOnly = !!previewOnly;
+    this.ensureAmbience();
     this.audio?.click?.();
     this.updateRulesButtons();
+    this.updateIntroButtons();
     this.showScreen("letter");
+  }
+
+  /** Solo la sección "Antes de abrir" (sin reglamento). */
+  showInstructions() {
+    this.briefingOnly = true;
+    this.ensureAmbience();
+    this.audio?.click?.();
+    this.updateIntroButtons();
+    this.showScreen("intro");
+  }
+
+  updateIntroButtons() {
+    const introBtn = document.getElementById("btn-intro-next");
+    if (!introBtn) return;
+    if (this.briefingOnly) {
+      introBtn.textContent = "Volver al menú";
+    } else {
+      introBtn.textContent = "Ver el reglamento";
+    }
   }
 
   updateRulesButtons() {
     const startBtn = document.getElementById("btn-close-rules");
     const backBtn = document.getElementById("btn-rules-back-menu");
-    if (this.briefingOnly) {
-      startBtn.textContent = "Volver al menú";
-      backBtn.classList.add("hidden");
-    } else if (this.playing) {
+    if (this.playing) {
       startBtn.textContent = "Cerrar";
       backBtn.classList.add("hidden");
     } else {
@@ -196,6 +272,14 @@ export class Game {
     ["menu", "letter", "intro", "rules", "hud", "pause", "end"].forEach((id) => {
       document.getElementById(`screen-${id}`).classList.toggle("active", id === name);
     });
+    const onMenu = name === "menu";
+    this.menuScene?.setActive(onMenu);
+    if (this.canvas) this.canvas.style.opacity = onMenu ? "0" : "1";
+
+    // Sonido de papel al abrir carta / instrucciones / reglamento
+    if (name === "letter" || name === "intro" || name === "rules") {
+      this.ensureAmbience().then(() => this.audio?.paperFlip?.());
+    }
   }
 
   pauseGame() {
@@ -224,26 +308,36 @@ export class Game {
     this.hideCustomerPanel();
     this.hidePhone();
     this.audio?.click?.();
-    this.audio?.stopAmbient?.();
+    this.ensureAmbience();
     this.showScreen("menu");
   }
 
   async startShift() {
     await this.audio.init();
     this.audio.resume();
-    this.audio.ovenHumStart();
+    this.audio.startAmbience();
 
     this.playing = true;
     this.paused = false;
     this.timeMinutes = 22 * 60;
     this.fear = 0;
     this.doorLocked = true;
+    this.doorAutoNextIn = 0; // se arma al cruzar las 02:00
     this.freezerOpen = false;
     this.freezerKnock = false;
     this.freezerKnockTimer = 25 + Math.random() * 40;
+    this.freezerAutoPhase = null;
+    this.freezerAutoTimer = 0;
+    this.freezerAutoCloseIn = -1;
+    this.freezerAutoNextIn = 40 + Math.random() * 45;
+    this.ovenOn = true;
+    this.ovenOffDeadline = 0;
+    this.ovenEventTimer = 45 + Math.random() * 50;
     this.lookingTable6 = false;
     this.renderer.setLookingBehind(false);
+    this.syncBehindControls(false);
     this.renderer.setFreezerOpen(false);
+    this.renderer.setOvenOn(true);
     this.table6Timer = 0;
     this.flickerIntensity = 0;
     this.flickerTimer = 35 + Math.random() * 40;
@@ -267,7 +361,7 @@ export class Game {
     this.updateFearUI();
     this.updateClockUI();
     this.showScreen("hud");
-    this.showBanner("Turno iniciado. Click derecho: mirar atrás. Click: congelador/puerta.");
+    this.showBanner("Turno iniciado. Click: congelador / horno / puerta. Click derecho: mirar atrás.");
   }
 
   toggleRulesPanel() {
@@ -282,7 +376,7 @@ export class Game {
   }
 
   checkFreezer(fromClick = false) {
-    if (!this.playing) return;
+    if (!this.playing || this.isLookingBehind()) return;
     this.audio.click();
 
     // Abrir mientras hay golpes = muerte
@@ -304,20 +398,62 @@ export class Game {
       );
       this.addFear(4);
     } else {
-      this.showBanner("Cierras el congelador. Mejor así.");
+      // Cerrar a tiempo cancela la emergencia de apertura sola
+      if (this.freezerAutoPhase) {
+        this.freezerAutoPhase = null;
+        this.freezerAutoTimer = 0;
+        this.freezerAutoCloseIn = -1;
+        this.freezerAutoNextIn = 35 + Math.random() * 50;
+        this.showBanner("Cierras el congelador a tiempo. El frío se queda dentro.");
+      } else {
+        this.showBanner("Cierras el congelador. Mejor así.");
+      }
       this.addFear(-1);
     }
   }
 
+  toggleOven(fromClick = false) {
+    if (!this.playing || !this.isLookingBehind()) return;
+    this.audio.click();
+
+    if (!this.ovenOn) {
+      // Encender (cancela emergencia si venía de apagón solo)
+      this.ovenOn = true;
+      this.ovenOffDeadline = 0;
+      this.ovenEventTimer = 40 + Math.random() * 55;
+      this.renderer.setOvenOn(true);
+      this.showBanner(
+        fromClick
+          ? "Reavivas las brasas. El horno vuelve a respirar."
+          : "Enciendes el horno."
+      );
+      this.addFear(-1);
+      return;
+    }
+
+    // Apagar manualmente (sin jumpscare; el peligro es cuando se apaga solo)
+    this.ovenOn = false;
+    this.ovenOffDeadline = 0;
+    this.renderer.setOvenOn(false);
+    this.showBanner("Apagas el horno. Puedes volver a encenderlo con [H] o click.");
+  }
+
   toggleDoor() {
-    if (!this.playing) return;
+    if (!this.playing || !this.isLookingBehind()) return;
     this.audio.click();
     this.doorLocked = !this.doorLocked;
-    this.showBanner(
-      this.doorLocked
-        ? "Cierras la puerta trasera y echas el cerrojo."
-        : "Abres la puerta trasera. La noche se siente más cerca."
-    );
+    if (this.doorLocked) {
+      this.eventCooldown = 0;
+      // Tras cerrar de madrugada, puede volver a abrirse sola más tarde
+      const hour = this.getDisplayHour();
+      if (hour >= 2 && hour < 6) {
+        this.doorAutoNextIn = 20 + Math.random() * 40;
+      }
+      this.showBanner("Cierras la puerta trasera y echas el cerrojo.");
+    } else {
+      this.eventCooldown = 0;
+      this.showBanner("Abres la puerta trasera. La noche se siente más cerca.");
+    }
   }
 
   showBanner(text, dur = 3.2) {
@@ -367,7 +503,7 @@ export class Game {
     this.currentCustomer = customer;
     this.renderer.setCustomer(customer);
     this.showCustomerUI(customer);
-    this.audio.tone(220, 0.1, "triangle", 0.05);
+    this.audio.customerEnter();
     this.showBanner("Alguien se acerca al mostrador…");
   }
 
@@ -509,7 +645,7 @@ export class Game {
   flashBlood() {
     const el = document.getElementById("blood-flash");
     el.classList.add("on");
-    setTimeout(() => el.classList.remove("on"), 200);
+    setTimeout(() => el.classList.remove("on"), 700);
   }
 
   die(kind, customMsg, customDetail) {
@@ -553,6 +689,7 @@ export class Game {
         doorLocked: this.doorLocked ?? true,
         freezerKnock: false,
         freezerOpen: this.freezerOpen ?? false,
+        ovenOn: this.ovenOn !== false,
         hourDecimal: this.playing ? this.getHourDecimal() : 23,
         hoverTable6: false,
       });
@@ -579,7 +716,7 @@ export class Game {
         return;
       }
       if (this.table6Timer > 1.5) {
-        this.showBanner(`Aparta la vista de la Mesa 6… (${(3 - this.table6Timer).toFixed(1)}s)`);
+        this.showBanner('Algo raro se ve en la mesa 6…');
       }
     } else {
       this.table6Timer = Math.max(0, this.table6Timer - dt * 1.5);
@@ -588,6 +725,28 @@ export class Game {
     // Puerta trasera después de 02:00
     const hour = this.getDisplayHour();
     const past2 = hour >= 2 && hour < 6;
+
+    // A partir de las 02:00 puede abrirse sola
+    if (past2) {
+      if (this.doorLocked) {
+        if (this.doorAutoNextIn <= 0) {
+          this.doorAutoNextIn = 12 + Math.random() * 28;
+        } else {
+          this.doorAutoNextIn -= dt;
+          if (this.doorAutoNextIn <= 0) {
+            this.doorLocked = false;
+            this.eventCooldown = 0;
+            this.audio.noiseBurst?.(0.25, 0.07, {
+              freq: 220, filter: "lowpass", color: "brown",
+            });
+            this.showBanner("La puerta trasera está abierta");
+          }
+        }
+      }
+    } else {
+      this.doorAutoNextIn = 0;
+    }
+
     if (past2 && !this.doorLocked) {
       this.eventCooldown += dt;
       if (this.eventCooldown > 4) {
@@ -599,6 +758,67 @@ export class Game {
     }
 
     // Congelador
+    // —— Horno: apagón espontáneo ——
+    if (this.ovenOn && this.ovenOffDeadline <= 0) {
+      this.ovenEventTimer -= dt;
+      if (this.ovenEventTimer <= 0) {
+        this.ovenOn = false;
+        this.ovenOffDeadline = 5;
+        this.renderer.setOvenOn(false);
+        this.audio.noiseBurst?.(0.35, 0.1, { freq: 180, filter: "lowpass", color: "brown" });
+        this.showBanner("¡El horno se apagó!");
+      }
+    } else if (!this.ovenOn && this.ovenOffDeadline > 0) {
+      this.ovenOffDeadline -= dt;
+      if (this.ovenOffDeadline <= 0) {
+        this.die("oven_cold");
+        return;
+      }
+    }
+
+    // —— Congelador: se abre solo ——
+    if (!this.freezerAutoPhase && !this.freezerKnock && !this.freezerOpen) {
+      this.freezerAutoNextIn -= dt;
+      if (this.freezerAutoNextIn <= 0) {
+        this.freezerOpen = true;
+        this.renderer.setFreezerOpen(true);
+        this.freezerAutoPhase = "grace";
+        this.freezerAutoTimer = 5;
+        this.freezerAutoCloseIn = Math.random() < 0.55 ? 1.2 + Math.random() * 3.5 : -1;
+        this.audio.noiseBurst?.(0.2, 0.08, { freq: 320, filter: "bandpass", Q: 2, color: "pink" });
+        this.showBanner(
+          this.freezerAutoCloseIn > 0
+            ? "El congelador se abrió solo…"
+            : "El congelador se abrió solo. No se ve que vaya a cerrarse…"
+        );
+      }
+    } else if (this.freezerAutoPhase === "grace") {
+      this.freezerAutoTimer -= dt;
+      if (this.freezerAutoCloseIn > 0) {
+        this.freezerAutoCloseIn -= dt;
+        if (this.freezerAutoCloseIn <= 0 && this.freezerOpen) {
+          this.freezerOpen = false;
+          this.renderer.setFreezerOpen(false);
+          this.freezerAutoPhase = null;
+          this.freezerAutoTimer = 0;
+          this.freezerAutoCloseIn = -1;
+          this.freezerAutoNextIn = 35 + Math.random() * 50;
+          this.showBanner("El congelador se cerró solo. Por ahora.");
+        }
+      }
+      if (this.freezerAutoPhase === "grace" && this.freezerAutoTimer <= 0 && this.freezerOpen) {
+        this.freezerAutoPhase = "must_close";
+        this.freezerAutoTimer = 5;
+        this.showBanner("¡El congelador sigue abierto!");
+      }
+    } else if (this.freezerAutoPhase === "must_close") {
+      this.freezerAutoTimer -= dt;
+      if (this.freezerAutoTimer <= 0 && this.freezerOpen) {
+        this.die("freezer_ajar");
+        return;
+      }
+    }
+
     if (!this.freezerKnock) {
       this.freezerKnockTimer -= dt;
       if (this.freezerKnockTimer <= 0) {
@@ -609,7 +829,7 @@ export class Game {
         }
         this.freezerKnock = true;
         this._knockLeft = 8 + Math.random() * 6;
-        this.showBanner("…golpes sordos desde el congelador. No lo abras.");
+        this.showBanner("…golpes sordos desde el congelador.");
         this.audio.knock();
       }
     } else {
@@ -628,7 +848,7 @@ export class Game {
       this.flickerIntensity = 1;
       this.eyesClosedNeeded = true;
       this._flickerLeft = 3.5 + Math.random() * 1.5;
-      this.showBanner("Las luces parpadean. Cierra los ojos. [Espacio]");
+      this.showBanner("Las luces parpadean. Cierra los ojos.");
       this.audio.noiseBurst(0.15, 0.1);
     }
     if (this.flickerIntensity > 0) {
@@ -691,8 +911,15 @@ export class Game {
     }
 
     const note = document.getElementById("ambient-note");
-    if (this.freezerKnock) note.textContent = "Algo golpea el metal del congelador…";
+    if (!this.ovenOn && this.ovenOffDeadline > 0) {
+      note.textContent = 'Horno apagado.';
+    } else if (this.freezerAutoPhase === "must_close") {
+      note.textContent = 'Cierra el congelador.';
+    } else if (this.freezerAutoPhase === "grace") {
+      note.textContent = "El congelador quedó abierto…";
+    } else if (this.freezerKnock) note.textContent = "Algo golpea el metal del congelador…";
     else if (this.flickerIntensity > 0) note.textContent = "El neón chisporrotea.";
+    else if (!this.ovenOn) note.textContent = "El horno está apagado.";
     else if (hour >= 0 && hour < 4) note.textContent = "La lluvia no debería sonar así.";
     else note.textContent = "Huele a orégano y a algo más viejo.";
 
@@ -705,6 +932,7 @@ export class Game {
       doorLocked: this.doorLocked,
       freezerKnock: this.freezerKnock,
       freezerOpen: this.freezerOpen,
+      ovenOn: this.ovenOn,
       hourDecimal: this.getHourDecimal(),
       hoverTable6: this.hoverTable6,
     });
@@ -713,11 +941,16 @@ export class Game {
   loop(ts) {
     const dt = Math.min(0.05, (ts - (this.lastTs || ts)) / 1000);
     this.lastTs = ts;
-    this.update(dt);
-    this.renderer.draw({
-      hourDecimal: this.getHourDecimal(),
-      hoverTable6: this.hoverTable6,
-    });
+    if (this.menuScene?.active) {
+      this.menuScene.update(dt);
+      this.menuScene.draw();
+    } else {
+      this.update(dt);
+      this.renderer.draw({
+        hourDecimal: this.getHourDecimal(),
+        hoverTable6: this.hoverTable6,
+      });
+    }
     requestAnimationFrame(this.loop);
   }
 }

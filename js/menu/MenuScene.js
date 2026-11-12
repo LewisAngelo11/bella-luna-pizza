@@ -1,0 +1,729 @@
+/**
+ * Escena 3D del menú — exterior Bella Luna de noche.
+ * Independiente del Renderer de gameplay. Sin sombras dinámicas.
+ */
+import * as THREE from "three";
+import { texCanvas } from "../render/texUtils.js";
+
+const VERSION = "v0.9.0 · turno nocturno";
+
+export class MenuScene {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.active = false;
+    this.t = 0;
+    this.pointerX = 0.5;
+    this.pointerY = 0.5;
+    this._box = new THREE.BoxGeometry(1, 1, 1);
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: false,
+      powerPreference: "high-performance",
+      alpha: false,
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.38;
+    this.renderer.shadowMap.enabled = false;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x121c28);
+    this.scene.fog = new THREE.FogExp2(0x0c1420, 0.008);
+
+    this.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 80);
+    this._camBase = new THREE.Vector3(-9.2, 2.55, 11.2);
+    this.camera.position.copy(this._camBase);
+    this._look = new THREE.Vector3(5.8, 1.85, -0.4);
+    this.camera.lookAt(this._look);
+
+    this.root = new THREE.Group();
+    this.scene.add(this.root);
+
+    this._buildTextures();
+    this._buildLights();
+    this._buildGround();
+    this._buildSky();
+    this._buildBuilding();
+    this._buildNeon();
+    this._buildAwning();
+    this._buildInteriorGlow();
+    this._buildProps();
+    this._buildPines();
+    this._buildFogWisps();
+
+    // Edificio anclado a la derecha; UI ocupa el negativo a la izquierda
+    this.root.position.set(5.8, 0, -1.8);
+    this.root.rotation.y = -0.48;
+
+    this._onMove = (e) => {
+      this.pointerX = e.clientX / window.innerWidth;
+      this.pointerY = e.clientY / window.innerHeight;
+    };
+    this._onResize = () => this.resize();
+    window.addEventListener("pointermove", this._onMove, { passive: true });
+    window.addEventListener("resize", this._onResize);
+    this.resize();
+  }
+
+  box(w, h, d, mat, x, y, z, parent = this.root) {
+    const m = new THREE.Mesh(this._box, mat);
+    m.scale.set(w, h, d);
+    m.position.set(x, y, z);
+    parent.add(m);
+    return m;
+  }
+
+  _buildTextures() {
+    this.tex = {};
+    this.tex.brick = texCanvas((ctx, w, h) => {
+      ctx.fillStyle = "#4a2c20";
+      ctx.fillRect(0, 0, w, h);
+      const bw = 32;
+      const bh = 14;
+      for (let y = 0; y < h; y += bh) {
+        const off = (Math.floor(y / bh) % 2) * (bw / 2);
+        for (let x = -bw; x < w + bw; x += bw) {
+          const shade = 72 + Math.random() * 48;
+          ctx.fillStyle = `rgb(${shade + 38},${shade + 8},${shade - 12})`;
+          ctx.fillRect(x + off + 1, y + 1, bw - 2, bh - 2);
+          ctx.fillStyle = "rgba(255,200,150,0.08)";
+          ctx.fillRect(x + off + 2, y + 2, bw - 5, 3);
+        }
+      }
+    }, 256, 256);
+    this.tex.brick.repeat.set(6, 3);
+
+    this.tex.asphalt = texCanvas((ctx, w, h) => {
+      ctx.fillStyle = "#121418";
+      ctx.fillRect(0, 0, w, h);
+      for (let i = 0; i < 800; i++) {
+        const v = 18 + Math.random() * 22;
+        ctx.fillStyle = `rgba(${v},${v},${v + 4},${0.3 + Math.random() * 0.4})`;
+        ctx.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1);
+      }
+      // reflejos húmedos
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `rgba(80,60,40,${0.04 + Math.random() * 0.06})`;
+        ctx.fillRect(Math.random() * w, Math.random() * h, 20 + Math.random() * 60, 2);
+      }
+    }, 256, 256);
+    this.tex.asphalt.repeat.set(8, 8);
+
+    this.tex.neonSign = texCanvas((ctx, w, h) => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#12080a";
+      ctx.fillRect(0, 0, w, h);
+      // pizza slice
+      ctx.fillStyle = "#ffd866";
+      ctx.shadowColor = "#ffaa22";
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.moveTo(36, 30);
+      ctx.lineTo(90, 110);
+      ctx.lineTo(20, 110);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ff5522";
+      [[40, 55], [55, 75], [38, 85]].forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Bella Luna
+      ctx.fillStyle = "#fff0a0";
+      ctx.font = "bold 42px Georgia, serif";
+      ctx.textAlign = "left";
+      ctx.shadowColor = "#ffcc44";
+      ctx.shadowBlur = 22;
+      ctx.fillText("Bella Luna", 105, 70);
+      ctx.shadowBlur = 10;
+      ctx.fillText("Bella Luna", 105, 70);
+      // PIZZA
+      ctx.fillStyle = "#ff4444";
+      ctx.shadowColor = "#ff1100";
+      ctx.shadowBlur = 26;
+      ctx.font = "bold 48px Impact, sans-serif";
+      ctx.fillText("PIZZA", 105, 125);
+      ctx.shadowBlur = 12;
+      ctx.fillText("PIZZA", 105, 125);
+      // stars
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = "#ffe888";
+      [[95, 35], [280, 40], [300, 90]].forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }, 512, 160);
+
+    this.tex.moon = texCanvas((ctx, w, h) => {
+      ctx.clearRect(0, 0, w, h);
+      // Halo
+      const halo = ctx.createRadialGradient(w * 0.5, h * 0.5, w * 0.16, w * 0.5, h * 0.5, w * 0.48);
+      halo.addColorStop(0, "rgba(255,255,255,0.35)");
+      halo.addColorStop(0.55, "rgba(210,225,255,0.12)");
+      halo.addColorStop(1, "rgba(180,200,255,0)");
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(w * 0.5, h * 0.5, w * 0.48, 0, Math.PI * 2);
+      ctx.fill();
+      // Disco blanco nítido
+      ctx.shadowColor = "#ffffff";
+      ctx.shadowBlur = 28;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(w * 0.5, h * 0.5, w * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      const g = ctx.createRadialGradient(w * 0.44, h * 0.42, 2, w * 0.5, h * 0.5, w * 0.22);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.7, "#f4f7ff");
+      g.addColorStop(1, "#dce6f8");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(w * 0.5, h * 0.5, w * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(160,175,200,0.22)";
+      [[0.42, 0.42, 0.03], [0.56, 0.5, 0.022], [0.48, 0.58, 0.026]].forEach(([x, y, r]) => {
+        ctx.beginPath();
+        ctx.arc(w * x, h * y, w * r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }, 256, 256);
+
+    // Luna creciente del letrero (neón)
+    this.tex.crescent = texCanvas((ctx, w, h) => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#ffb030";
+      ctx.shadowColor = "#ff7700";
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(w * 0.48, h * 0.5, w * 0.36, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(w * 0.66, h * 0.42, w * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      // ojos / sonrisa sutiles
+      ctx.fillStyle = "rgba(80,30,10,0.35)";
+      ctx.beginPath();
+      ctx.arc(w * 0.34, h * 0.42, 4, 0, Math.PI * 2);
+      ctx.arc(w * 0.42, h * 0.38, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(80,30,10,0.4)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(w * 0.36, h * 0.55, 10, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+    }, 256, 256);
+
+    this.mats = {
+      brick: new THREE.MeshStandardMaterial({
+        map: this.tex.brick,
+        color: 0xffe8d8,
+        roughness: 0.88,
+        metalness: 0.02,
+        emissive: 0x3a1810,
+        emissiveIntensity: 0.22,
+      }),
+      asphalt: new THREE.MeshStandardMaterial({
+        map: this.tex.asphalt, color: 0xffffff, roughness: 0.35, metalness: 0.15,
+      }),
+      roof: new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.9 }),
+      trim: new THREE.MeshStandardMaterial({ color: 0x3a241c, roughness: 0.85 }),
+      awningRed: new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.8 }),
+      awningWhite: new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.75 }),
+      glass: new THREE.MeshStandardMaterial({
+        color: 0xffa040,
+        emissive: 0xff7018,
+        emissiveIntensity: 2.45,
+        transparent: true,
+        opacity: 0.95,
+        roughness: 0.12,
+        metalness: 0.3,
+      }),
+      glassGlow: new THREE.MeshBasicMaterial({
+        color: 0xff8028,
+        transparent: true,
+        opacity: 0.48,
+        depthWrite: false,
+      }),
+      wood: new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.85 }),
+      metal: new THREE.MeshStandardMaterial({ color: 0x3a4248, roughness: 0.4, metalness: 0.7 }),
+      neonBoard: new THREE.MeshBasicMaterial({ map: this.tex.neonSign }),
+      crescent: new THREE.MeshBasicMaterial({
+        map: this.tex.crescent, transparent: true, depthWrite: false,
+      }),
+      moon: new THREE.MeshBasicMaterial({ map: this.tex.moon, transparent: true, depthWrite: false }),
+      foliage: new THREE.MeshStandardMaterial({ color: 0x0e1810, roughness: 1 }),
+      car: new THREE.MeshStandardMaterial({ color: 0x5a1010, roughness: 0.45, metalness: 0.3 }),
+      wet: new THREE.MeshStandardMaterial({
+        color: 0x221810, roughness: 0.12, metalness: 0.7,
+        transparent: true, opacity: 0.62,
+      }),
+      puddleGlow: new THREE.MeshBasicMaterial({
+        color: 0xff7818,
+        transparent: true,
+        opacity: 0.32,
+        depthWrite: false,
+      }),
+    };
+  }
+
+  _buildLights() {
+    this.scene.add(new THREE.AmbientLight(0x2a3038, 0.55));
+    const hemi = new THREE.HemisphereLight(0x445566, 0x1a100c, 0.55);
+    this.scene.add(hemi);
+
+    this.moonLight = new THREE.DirectionalLight(0xc0d0e8, 0.55);
+    this.moonLight.position.set(-8, 12, 4);
+    this.scene.add(this.moonLight);
+
+    // Luz frontal cálida para leer el ladrillo
+    this.facadeLight = new THREE.DirectionalLight(0xffc090, 0.65);
+    this.facadeLight.position.set(-2, 4, 10);
+    this.root.add(this.facadeLight);
+
+    this.neonLight = new THREE.PointLight(0xff7744, 4.2, 24);
+    this.neonLight.position.set(0, 5.2, 2.8);
+    this.root.add(this.neonLight);
+
+    this.interiorLight = new THREE.PointLight(0xff7a20, 6.2, 18);
+    this.interiorLight.position.set(0, 1.9, 1.2);
+    this.root.add(this.interiorLight);
+
+    // Derrame cálido desde cada vano (fachada + reflejo en suelo)
+    this.windowLights = [
+      [-3.2, 2.0, 3.75],
+      [3.2, 2.0, 3.75],
+      [0, 1.7, 3.8],
+    ].map(([x, y, z]) => {
+      const pl = new THREE.PointLight(0xff7018, 4.2, 7.5);
+      pl.position.set(x, y, z);
+      this.root.add(pl);
+      return pl;
+    });
+
+    this.groundWash = [
+      [-3.2, 0.35, 4.6],
+      [3.2, 0.35, 4.6],
+      [0, 0.35, 4.7],
+    ].map(([x, y, z]) => {
+      const pl = new THREE.PointLight(0xff6810, 2.6, 4.2);
+      pl.position.set(x, y, z);
+      this.root.add(pl);
+      return pl;
+    });
+
+    this.signLight = new THREE.PointLight(0xffee77, 2.6, 12);
+    this.signLight.position.set(-0.2, 5.15, 3.2);
+    this.root.add(this.signLight);
+  }
+
+  _buildGround() {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 40), this.mats.asphalt);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(-2, 0, 4);
+    this.root.add(ground);
+
+    // Capa húmeda que recoge el neón / interior
+    const wet = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), this.mats.wet);
+    wet.rotation.x = -Math.PI / 2;
+    wet.position.set(0, 0.02, 5.5);
+    this.root.add(wet);
+
+    // Charcos luminosos bajo ventanas / puerta
+    [
+      [-3.2, 3.2, 1.1],
+      [3.2, 3.2, 1.1],
+      [0, 3.6, 0.85],
+    ].forEach(([x, z, w]) => {
+      const puddle = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, 2.8),
+        this.mats.puddleGlow,
+      );
+      puddle.rotation.x = -Math.PI / 2;
+      puddle.position.set(x, 0.035, z);
+      this.root.add(puddle);
+    });
+
+    // Acera
+    this.box(14, 0.08, 3.2, this.mats.trim, 0, 0.04, 3.2);
+  }
+
+  _buildSky() {
+    // Luna blanca fija en esquina superior derecha (espacio de cámara)
+    const moon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.mats.moon);
+    moon.renderOrder = 2;
+    this.camera.add(moon);
+    this.scene.add(this.camera);
+    this.moonMesh = moon;
+    this._placeMoon();
+
+    // Nubes simples (planos oscuros), lejos del disco lunar
+    for (let i = 0; i < 5; i++) {
+      const c = this.box(
+        6 + Math.random() * 5, 0.4, 2 + Math.random() * 2,
+        new THREE.MeshBasicMaterial({ color: 0x121820, transparent: true, opacity: 0.32 }),
+        -8 + i * 4.5, 8 + Math.random() * 2.5, -14 - Math.random() * 4,
+        this.scene,
+      );
+      c.rotation.y = Math.random() * 0.5;
+    }
+  }
+
+  _buildBuilding() {
+    const g = new THREE.Group();
+    this.building = g;
+    this.root.add(g);
+
+    // Cuerpo ladrillo
+    this.box(12, 4.2, 7, this.mats.brick, 0, 2.1, 0, g);
+    // Techo
+    this.box(12.4, 0.35, 7.4, this.mats.roof, 0, 4.35, 0, g);
+    // Remate
+    this.box(12.6, 0.2, 0.4, this.mats.trim, 0, 4.55, 3.55, g);
+
+    // Marco ventanas / puerta
+    this.box(11.5, 2.4, 0.15, this.mats.trim, 0, 1.8, 3.48, g);
+
+    // Cristales con glow interior cálido
+    this.windowL = this.box(3.4, 2.0, 0.08, this.mats.glass, -3.2, 1.85, 3.55, g);
+    this.windowR = this.box(3.4, 2.0, 0.08, this.mats.glass, 3.2, 1.85, 3.55, g);
+    this.doorGlass = this.box(1.6, 2.3, 0.08, this.mats.glass, 0, 1.55, 3.56, g);
+
+    // Halo suave delante del cristal (más brillo / “bloom” barato)
+    this.windowHalos = [
+      [-3.2, 1.85, 3.4, 2.0],
+      [3.2, 1.85, 3.4, 2.0],
+      [0, 1.55, 2.0, 2.35],
+    ].map(([x, y, w, h]) => {
+      const halo = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        this.mats.glassGlow,
+      );
+      halo.position.set(x, y, 3.62);
+      g.add(halo);
+      return halo;
+    });
+
+    // Marcos verticales
+    [-5.0, -1.4, 1.4, 5.0].forEach((x) => {
+      this.box(0.18, 2.3, 0.2, this.mats.trim, x, 1.8, 3.52, g);
+    });
+    this.box(11.2, 0.15, 0.2, this.mats.trim, 0, 2.95, 3.52, g);
+    this.box(11.2, 0.15, 0.2, this.mats.trim, 0, 0.75, 3.52, g);
+
+    // Cartel ABIERTO
+    const openTex = texCanvas((ctx, w, h) => {
+      ctx.fillStyle = "#2a1810";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#33ff66";
+      ctx.font = "bold 36px sans-serif";
+      ctx.textAlign = "center";
+      ctx.shadowColor = "#22ff55";
+      ctx.shadowBlur = 8;
+      ctx.fillText("ABIERTO", w / 2, h / 2 + 12);
+    }, 256, 64);
+    const openSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.9, 0.28),
+      new THREE.MeshBasicMaterial({ map: openTex }),
+    );
+    openSign.position.set(0, 2.55, 3.65);
+    g.add(openSign);
+  }
+
+  _buildNeon() {
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.5, 1.7),
+      this.mats.neonBoard,
+    );
+    board.position.set(0, 5.15, 3.7);
+    this.root.add(board);
+    this.neonBoard = board;
+
+    // Luna creciente neón al lado del letrero
+    const crescent = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.35, 1.35),
+      this.mats.crescent,
+    );
+    crescent.position.set(3.15, 5.25, 3.82);
+    this.root.add(crescent);
+    this.crescent = crescent;
+
+    // Backboard del letrero
+    this.box(5.8, 1.9, 0.15, this.mats.trim, 0, 5.15, 3.55);
+  }
+
+  _buildAwning() {
+    const awn = new THREE.Group();
+    awn.position.set(0, 3.15, 3.9);
+    this.root.add(awn);
+    const stripes = 10;
+    const w = 11.2 / stripes;
+    for (let i = 0; i < stripes; i++) {
+      const mat = i % 2 === 0 ? this.mats.awningRed : this.mats.awningWhite;
+      this.box(w * 0.98, 0.08, 1.4, mat, -5.5 + w * (i + 0.5), 0, 0.3, awn);
+    }
+    // Inclinación
+    awn.rotation.x = 0.28;
+    // Soportes
+    [-4.5, 0, 4.5].forEach((x) => {
+      this.box(0.06, 0.9, 0.06, this.mats.metal, x, 2.7, 4.2);
+    });
+  }
+
+  _buildInteriorGlow() {
+    // Mesas silueta dentro (muy simples, vistas a través del vidrio)
+    const tableMat = new THREE.MeshStandardMaterial({
+      color: 0x3a2818, emissive: 0x331808, emissiveIntensity: 0.25, roughness: 0.8,
+    });
+    [[-3, 1.2], [3, 1.2], [-2.5, -0.5], [2.5, -0.5]].forEach(([x, z]) => {
+      this.box(1.1, 0.08, 1.1, tableMat, x, 0.85, z);
+      this.box(0.1, 0.8, 0.1, tableMat, x, 0.4, z);
+    });
+    // Lámparas interiores más cálidas
+    [[-3, 0.8], [3, 0.8], [0, 0.2]].forEach(([x, z]) => {
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.14, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff9030 }),
+      );
+      bulb.position.set(x, 3.2, z);
+      this.root.add(bulb);
+    });
+  }
+
+  _buildProps() {
+    // Banco
+    this.box(1.8, 0.08, 0.5, this.mats.wood, -5.2, 0.55, 4.2);
+    this.box(0.08, 0.5, 0.5, this.mats.wood, -6.0, 0.3, 4.2);
+    this.box(0.08, 0.5, 0.5, this.mats.wood, -4.4, 0.3, 4.2);
+
+    // Basura
+    this.box(0.45, 0.7, 0.45, this.mats.metal, 5.5, 0.35, 4.0);
+
+    // Pizarra
+    const chalk = texCanvas((ctx, w, h) => {
+      ctx.fillStyle = "#1a2218";
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "#c4a882";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(6, 6, w - 12, h - 12);
+      ctx.fillStyle = "#e8e0d0";
+      ctx.font = "28px Georgia";
+      ctx.textAlign = "center";
+      ctx.fillText("Pizza", w / 2, 70);
+      ctx.fillText("Siempre Mejor", w / 2, 110);
+      ctx.fillText(":)", w / 2, 155);
+    }, 256, 256);
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.1, 1.3),
+      new THREE.MeshBasicMaterial({ map: chalk }),
+    );
+    board.position.set(6.2, 1.0, 4.3);
+    board.rotation.y = -0.4;
+    this.root.add(board);
+
+    // Macetas
+    [-4.2, 4.2].forEach((x) => {
+      this.box(0.4, 0.35, 0.4, this.mats.wood, x, 0.2, 4.5);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), this.mats.foliage);
+      bush.position.set(x, 0.55, 4.5);
+      this.root.add(bush);
+    });
+
+    // Coche parcial (izquierda)
+    const car = new THREE.Group();
+    car.position.set(-11, 0, 6);
+    car.rotation.y = 0.5;
+    this.box(3.2, 0.7, 1.4, this.mats.car, 0, 0.55, 0, car);
+    this.box(2.0, 0.55, 1.3, this.mats.car, -0.2, 1.15, 0, car);
+    this.scene.add(car);
+
+    // Valla
+    for (let i = 0; i < 8; i++) {
+      this.box(0.08, 1.2, 0.08, this.mats.metal, -10 + i * 0.7, 0.6, 2.5, this.scene);
+    }
+    this.box(5.5, 0.06, 0.06, this.mats.metal, -7.5, 1.1, 2.5, this.scene);
+  }
+
+  _buildPines() {
+    // Siluetas oscuras; coordenadas LOCALES al root del restaurante
+    const pineMat = new THREE.MeshBasicMaterial({ color: 0x121c16 });
+    const trunkMat = new THREE.MeshBasicMaterial({ color: 0x1a140e });
+    const coneGeo = new THREE.ConeGeometry(1, 1, 7);
+    const trunkGeo = new THREE.CylinderGeometry(0.14, 0.2, 1, 5);
+
+    const makePine = (x, z, scale) => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.scale.setScalar(scale);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 1.0;
+      trunk.scale.set(1, 2.0, 1);
+      g.add(trunk);
+      [
+        [1.8, 1.5, 2.3],
+        [1.3, 1.25, 3.5],
+        [0.9, 1.1, 4.5],
+        [0.55, 0.95, 5.3],
+      ].forEach(([r, h, py]) => {
+        const cone = new THREE.Mesh(coneGeo, pineMat);
+        cone.scale.set(r, h, r);
+        cone.position.y = py;
+        g.add(cone);
+      });
+      this.root.add(g);
+    };
+
+    // Flanco derecho (junto al muro, visibles)
+    [
+      [7.4, 1.5, 1.15], [8.2, -0.5, 1.35], [8.8, -2.5, 1.25],
+      [9.3, 0.8, 1.45], [7.8, -4.0, 1.2], [9.0, -5.5, 1.4],
+    ].forEach(([x, z, s]) => makePine(x, z, s));
+
+    // Flanco izquierdo / detrás
+    [
+      [-7.6, 0.5, 1.2], [-8.4, -1.8, 1.35], [-7.2, -3.5, 1.25],
+      [-8.8, -5.0, 1.4], [-5.5, -5.5, 1.3], [-3.0, -6.2, 1.45],
+    ].forEach(([x, z, s]) => makePine(x, z, s));
+
+    // Fila trasera (asoman sobre el techo)
+    [
+      [-4.5, -7.0, 1.5], [-1.5, -7.5, 1.6], [1.5, -7.2, 1.55],
+      [4.0, -7.6, 1.65], [6.0, -6.8, 1.45], [0.0, -8.5, 1.7],
+      [3.0, -8.8, 1.6], [-2.5, -8.6, 1.55],
+    ].forEach(([x, z, s]) => makePine(x, z, s));
+
+    this._pineGeos = [coneGeo, trunkGeo];
+  }
+
+  _buildFogWisps() {
+    const n = 40;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = (Math.random() - 0.3) * 18;
+      pos[i * 3 + 1] = 0.2 + Math.random() * 1.5;
+      pos[i * 3 + 2] = Math.random() * 12;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    this.fogPts = new THREE.Points(
+      geo,
+      new THREE.PointsMaterial({
+        color: 0x8899aa, size: 0.35, transparent: true, opacity: 0.12, depthWrite: false,
+      }),
+    );
+    this.root.add(this.fogPts);
+  }
+
+  setActive(on) {
+    this.active = !!on;
+    this.canvas.style.opacity = on ? "1" : "0";
+    this.canvas.style.pointerEvents = "none";
+    if (on) this.resize();
+  }
+
+  _placeMoon() {
+    if (!this.moonMesh) return;
+    const z = 14;
+    const halfH = Math.tan((this.camera.fov * Math.PI) / 360) * z;
+    const halfW = halfH * this.camera.aspect;
+    const size = Math.min(halfW, halfH) * 0.85;
+    this.moonMesh.position.set(halfW * 0.74, halfH * 0.7, -z);
+    this.moonMesh.userData.baseScale = size;
+    this.moonMesh.scale.set(size, size, 1);
+  }
+
+  resize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h, false);
+    this._placeMoon();
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    this.t += dt;
+
+    // Parallax sutil con el ratón
+    const tx = this._camBase.x + (this.pointerX - 0.5) * 1.35;
+    const ty = this._camBase.y + (0.5 - this.pointerY) * 0.55;
+    const k = Math.min(1, dt * 2.5);
+    this.camera.position.x += (tx - this.camera.position.x) * k;
+    this.camera.position.y += (ty - this.camera.position.y) * k;
+    this._look.x = 5.8 + (this.pointerX - 0.5) * 0.45;
+    this._look.y = 1.85 + (0.5 - this.pointerY) * 0.28;
+    this.camera.lookAt(this._look);
+
+    // Neón parpadea
+    const flicker = Math.random() > 0.97 ? 0.4 : 1;
+    const pulse = 0.9 + Math.sin(this.t * 3.2) * 0.1;
+    if (this.neonLight) this.neonLight.intensity = 4.2 * pulse * flicker;
+    if (this.signLight) this.signLight.intensity = 2.6 * pulse * flicker;
+    if (this.crescent) {
+      this.crescent.scale.setScalar(0.96 + Math.sin(this.t * 4) * 0.04);
+      this.crescent.material.opacity = 0.85 + pulse * 0.15 * flicker;
+    }
+    if (this.mats.glass) {
+      this.mats.glass.emissiveIntensity = 2.05 + Math.sin(this.t * 1.5) * 0.22;
+    }
+    if (this.mats.glassGlow) {
+      this.mats.glassGlow.opacity = 0.36 + Math.sin(this.t * 1.5) * 0.08;
+    }
+    if (this.mats.puddleGlow) {
+      this.mats.puddleGlow.opacity = 0.22 + Math.sin(this.t * 1.5) * 0.06;
+    }
+    if (this.windowLights) {
+      const wPulse = 3.8 + Math.sin(this.t * 1.5) * 0.35;
+      for (const pl of this.windowLights) pl.intensity = wPulse;
+    }
+    if (this.groundWash) {
+      const gPulse = 2.3 + Math.sin(this.t * 1.5) * 0.25;
+      for (const pl of this.groundWash) pl.intensity = gPulse;
+    }
+    if (this.interiorLight) {
+      this.interiorLight.intensity = 5.8 + Math.sin(this.t * 1.2) * 0.4;
+    }
+
+    // Niebla lenta
+    if (this.fogPts) {
+      const p = this.fogPts.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        let x = p.getX(i) + dt * 0.15;
+        if (x > 10) x = -8;
+        p.setX(i, x);
+      }
+      p.needsUpdate = true;
+    }
+
+    // Luna respira (sin sacar del anclaje de esquina)
+    if (this.moonMesh) {
+      const base = this.moonMesh.userData.baseScale || this.moonMesh.scale.x;
+      this.moonMesh.userData.baseScale = base;
+      const s = base * (1 + Math.sin(this.t * 0.4) * 0.025);
+      this.moonMesh.scale.set(s, s, 1);
+    }
+  }
+
+  draw() {
+    if (!this.active) return;
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    this.active = false;
+    window.removeEventListener("pointermove", this._onMove);
+    window.removeEventListener("resize", this._onResize);
+    this.renderer.dispose();
+  }
+}
+
+export { VERSION };
