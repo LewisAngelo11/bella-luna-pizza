@@ -143,6 +143,44 @@ body:has(#screen-menu.active) #vignette {
   pointer-events: auto;
 }
 
+/* Cinemática: UI se retira y se ve el acercamiento a la puerta */
+#screen-menu.entering {
+  background: transparent !important;
+  transition: background 0.55s ease;
+}
+
+#screen-menu.entering .menu-content {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-12px);
+  transition: opacity 0.45s ease, transform 0.55s ease;
+}
+
+#screen-menu.entering .btn {
+  pointer-events: none;
+}
+
+#screen-menu.enter-fade::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 1;
+  z-index: 8;
+  pointer-events: none;
+  animation: menu-enter-fade 0.32s ease forwards;
+}
+
+@keyframes menu-enter-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+body:has(#screen-menu.entering) #vignette {
+  opacity: 0.35;
+  transition: opacity 0.5s ease;
+}
+
 .menu-content {
   position: relative;
   align-self: center;
@@ -150,6 +188,7 @@ body:has(#screen-menu.active) #vignette {
   max-width: min(440px, 92vw);
   padding: 2rem 1.5rem 2rem 6vw;
   z-index: 2;
+  transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
 .menu-actions {

@@ -95,7 +95,7 @@ export class Game {
   }
 
   bindUI() {
-    document.getElementById("btn-start").onclick = () => this.beginBriefing(false);
+    document.getElementById("btn-start").onclick = () => this.playEnterThenBriefing();
     document.getElementById("btn-rules-preview").onclick = () => this.showInstructions();
     document.getElementById("btn-letter-next").onclick = () => this.showScreen("intro");
     document.getElementById("btn-intro-next").onclick = () => {
@@ -225,6 +225,43 @@ export class Game {
     if (target === "table6") {
       this.showInfo("Estás mirando la Mesa 6…");
     }
+  }
+
+  /** Jugar: acerca la cámara a la puerta y luego abre la carta de la dueña. */
+  async playEnterThenBriefing() {
+    if (this._entering || this.playing) return;
+    this._entering = true;
+
+    await this.ensureAmbience();
+    this.audio?.click?.();
+
+    const menu = document.getElementById("screen-menu");
+    menu?.classList.add("entering");
+
+    // Mantener escena 3D visible durante el acercamiento
+    this.menuScene?.setActive(true);
+    if (this.canvas) this.canvas.style.opacity = "0";
+
+    const enterDur = 2.85;
+    this.audio?.menuApproach?.(enterDur);
+
+    try {
+      await this.menuScene.playEnterAnimation(enterDur);
+    } catch {
+      /* si falla la animación, seguimos al briefing */
+    }
+
+    // Fundido breve a negro antes de la carta
+    menu?.classList.add("enter-fade");
+    await new Promise((r) => setTimeout(r, 320));
+
+    menu?.classList.remove("entering", "enter-fade");
+    this._entering = false;
+
+    this.briefingOnly = false;
+    this.updateRulesButtons();
+    this.updateIntroButtons();
+    this.showScreen("letter");
   }
 
   beginBriefing(previewOnly) {

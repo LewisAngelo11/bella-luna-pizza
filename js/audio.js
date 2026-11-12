@@ -151,6 +151,120 @@ export class AudioEngine {
     this.tone(1200 + Math.random() * 400, 0.04, "sine", 0.025);
   }
 
+  /**
+   * Acercamiento a la puerta del menú (~2.8 s):
+   * viento que crece, pasos en el estacionamiento, zumbido del neón y llegada.
+   */
+  menuApproach(duration = 2.85) {
+    if (!this.enabled || !this.ctx) return;
+    this.resume();
+    const t0 = this._now();
+    const dur = Math.max(1.5, duration);
+
+    // Viento / whoosh que aumenta al acercarse
+    {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this._noiseBuffer(dur + 0.4, "brown");
+      const f = this.ctx.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.setValueAtTime(220, t0);
+      f.frequency.exponentialRampToValueAtTime(520, t0 + dur * 0.75);
+      f.frequency.exponentialRampToValueAtTime(280, t0 + dur);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.exponentialRampToValueAtTime(0.16, t0 + dur * 0.55);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + dur * 0.85);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur + 0.25);
+      src.connect(f);
+      f.connect(g);
+      g.connect(this.sfxGain || this.master);
+      src.start(t0);
+      src.stop(t0 + dur + 0.3);
+    }
+
+    // Drone grave (tensión / caminar de noche)
+    {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const f = this.ctx.createBiquadFilter();
+      o.type = "sine";
+      o.frequency.setValueAtTime(46, t0);
+      o.frequency.linearRampToValueAtTime(58, t0 + dur);
+      f.type = "lowpass";
+      f.frequency.value = 110;
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.exponentialRampToValueAtTime(0.05, t0 + dur * 0.4);
+      g.gain.exponentialRampToValueAtTime(0.07, t0 + dur * 0.9);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur + 0.2);
+      o.connect(f);
+      f.connect(g);
+      g.connect(this.sfxGain || this.master);
+      o.start(t0);
+      o.stop(t0 + dur + 0.25);
+    }
+
+    // Zumbido del neón acercándose
+    {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = "sawtooth";
+      o.frequency.value = 118;
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.exponentialRampToValueAtTime(0.012, t0 + dur * 0.5);
+      g.gain.exponentialRampToValueAtTime(0.028, t0 + dur * 0.9);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur + 0.15);
+      const f = this.ctx.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 240;
+      f.Q.value = 4;
+      o.connect(f);
+      f.connect(g);
+      g.connect(this.sfxGain || this.master);
+      o.start(t0 + dur * 0.2);
+      o.stop(t0 + dur + 0.2);
+    }
+
+    // Pasos en asfalto húmedo (ritmo de caminata)
+    const stepTimes = [0.28, 0.62, 0.96, 1.28, 1.58, 1.88, 2.14, 2.38, 2.58];
+    stepTimes.forEach((at, i) => {
+      if (at > dur - 0.15) return;
+      const delay = Math.max(0, (at - 0.02) * 1000);
+      setTimeout(() => {
+        if (!this.enabled) return;
+        const vol = 0.055 + Math.min(0.07, i * 0.007);
+        this.noiseBurst(0.09, vol, {
+          freq: 95 + (i % 2) * 25,
+          filter: "lowpass",
+          color: "brown",
+        });
+        setTimeout(() => {
+          this.noiseBurst(0.06, vol * 0.35, {
+            freq: 180,
+            filter: "bandpass",
+            Q: 1.2,
+            color: "pink",
+          });
+        }, 40);
+      }, delay);
+    });
+
+    // Llegada a la puerta: madera / cristal + golpe suave
+    setTimeout(() => {
+      if (!this.enabled) return;
+      this.noiseBurst(0.35, 0.1, {
+        freq: 380,
+        filter: "bandpass",
+        Q: 2.2,
+        color: "pink",
+      });
+      this.tone(160, 0.35, "triangle", 0.04, -18);
+      setTimeout(() => {
+        this.noiseBurst(0.12, 0.12, { freq: 110, filter: "lowpass", color: "brown" });
+        this.tone(90, 0.22, "sine", 0.035);
+      }, 120);
+    }, Math.max(0, (dur - 0.35) * 1000));
+  }
+
   /** Cliente entra: timbre + puerta + paso. */
   customerEnter() {
     if (!this.enabled) return;

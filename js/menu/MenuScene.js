@@ -14,7 +14,10 @@ export class MenuScene {
     this.t = 0;
     this.pointerX = 0.5;
     this.pointerY = 0.5;
+    this.entering = false;
+    this._enterAnim = null;
     this._box = new THREE.BoxGeometry(1, 1, 1);
+    this._camFovBase = 46;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -110,6 +113,178 @@ export class MenuScene {
       }
     }, 256, 256);
     this.tex.asphalt.repeat.set(8, 8);
+
+    // Estacionamiento frente al local: cajones pintados sobre asfalto
+    this.tex.street = texCanvas((ctx, w, h) => {
+      ctx.fillStyle = "#15171c";
+      ctx.fillRect(0, 0, w, h);
+
+      // grano de asfalto
+      for (let i = 0; i < 2600; i++) {
+        const v = 16 + Math.random() * 28;
+        ctx.fillStyle = `rgba(${v},${v + 1},${v + 4},${0.25 + Math.random() * 0.45})`;
+        ctx.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2.5, 1);
+      }
+
+      // grietas / desgaste
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 14; i++) {
+        ctx.beginPath();
+        let x = Math.random() * w;
+        let y = Math.random() * h;
+        ctx.moveTo(x, y);
+        for (let s = 0; s < 5; s++) {
+          x += (Math.random() - 0.5) * 36;
+          y += 6 + Math.random() * 18;
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // manchas de aceite / humedad neutras
+      for (let i = 0; i < 16; i++) {
+        const x = Math.random() * w;
+        const y = 60 + Math.random() * (h - 100);
+        const rw = 18 + Math.random() * 50;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rw);
+        g.addColorStop(0, `rgba(10,10,12,${0.18 + Math.random() * 0.15})`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rw, rw * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+    // —— Una sola fila de cajones apuntando al local (arriba = fachada) ——
+      const curbY = 36;
+      const stallTop = curbY + 12;
+      const stallLen = h * 0.62;
+      const stallBottom = stallTop + stallLen;
+      const stalls = 7;
+      const marginX = 40;
+      const usable = w - marginX * 2;
+      const stallW = usable / stalls;
+
+      // borde de acera
+      ctx.fillStyle = "#2c2e34";
+      ctx.fillRect(0, 0, w, curbY);
+      ctx.fillStyle = "rgba(220,220,220,0.12)";
+      ctx.fillRect(0, curbY - 2, w, 2);
+
+      ctx.strokeStyle = "rgba(230,225,200,0.8)";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "butt";
+
+      // línea frontal continua (tope hacia el restaurante)
+      ctx.beginPath();
+      ctx.moveTo(marginX, stallTop);
+      ctx.lineTo(w - marginX, stallTop);
+      ctx.stroke();
+
+      // divisores de cada cajón
+      for (let i = 0; i <= stalls; i++) {
+        const x = marginX + i * stallW;
+        ctx.beginPath();
+        ctx.moveTo(x, stallTop);
+        ctx.lineTo(x, stallBottom);
+        ctx.stroke();
+      }
+
+      // línea trasera de la fila
+      ctx.beginPath();
+      ctx.moveTo(marginX, stallBottom);
+      ctx.lineTo(w - marginX, stallBottom);
+      ctx.stroke();
+
+      // topes de rueda
+      ctx.fillStyle = "#3a2a22";
+      for (let i = 0; i < stalls; i++) {
+        const cx = marginX + (i + 0.5) * stallW;
+        ctx.fillRect(cx - stallW * 0.28, stallTop + 16, stallW * 0.56, 12);
+      }
+
+      // cajón discapacitados (segundo)
+      {
+        const i = 1;
+        const cx = marginX + (i + 0.5) * stallW;
+        const cy = stallTop + stallLen * 0.48;
+        ctx.fillStyle = "rgba(70,120,220,0.35)";
+        ctx.fillRect(marginX + i * stallW + 6, stallTop + 6, stallW - 12, stallLen - 12);
+        ctx.strokeStyle = "rgba(240,240,255,0.85)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy + 8, 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy - 12, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx - 2, cy - 4);
+        ctx.lineTo(cx - 2, cy + 12);
+        ctx.lineTo(cx + 16, cy + 12);
+        ctx.stroke();
+      }
+
+      // asfalto libre detrás de los cajones (sin segunda fila)
+      ctx.fillStyle = "rgba(18,20,26,0.35)";
+      ctx.fillRect(0, stallBottom + 4, w, h - stallBottom - 4);
+    }, 1024, 1024);
+    this.tex.street.wrapS = this.tex.street.wrapT = THREE.ClampToEdgeWrapping;
+    this.tex.street.repeat.set(1, 1);
+
+    // Cristal: interior cálido + reflejo naranja en la superficie
+    this.tex.glass = texCanvas((ctx, w, h) => {
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, "#3a2010");
+      bg.addColorStop(0.45, "#6a3818");
+      bg.addColorStop(1, "#2a160c");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      // resplandor interior
+      const glow = ctx.createRadialGradient(w * 0.5, h * 0.55, 4, w * 0.5, h * 0.5, w * 0.7);
+      glow.addColorStop(0, "rgba(255,160,60,0.75)");
+      glow.addColorStop(0.45, "rgba(255,100,30,0.35)");
+      glow.addColorStop(1, "rgba(40,16,8,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, w, h);
+
+      // siluetas suaves de mesas / lámparas
+      ctx.fillStyle = "rgba(20,10,6,0.35)";
+      ctx.fillRect(w * 0.15, h * 0.62, w * 0.22, h * 0.12);
+      ctx.fillRect(w * 0.62, h * 0.58, w * 0.2, h * 0.14);
+      ctx.fillStyle = "rgba(255,180,80,0.55)";
+      ctx.beginPath();
+      ctx.arc(w * 0.28, h * 0.28, 6, 0, Math.PI * 2);
+      ctx.arc(w * 0.72, h * 0.3, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // reflejos naranjas en el vidrio (bandas diagonales)
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 5; i++) {
+        const x = w * (0.08 + i * 0.18);
+        const g2 = ctx.createLinearGradient(x, 0, x + 28, h);
+        g2.addColorStop(0, "rgba(255,170,80,0)");
+        g2.addColorStop(0.35, `rgba(255,140,50,${0.22 + i * 0.04})`);
+        g2.addColorStop(0.7, "rgba(255,90,20,0.12)");
+        g2.addColorStop(1, "rgba(255,120,40,0)");
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 22, 0);
+        ctx.lineTo(x + 48, h);
+        ctx.lineTo(x + 18, h);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // brillo especular superior
+      ctx.fillStyle = "rgba(255,210,160,0.28)";
+      ctx.fillRect(0, 0, w, h * 0.08);
+      ctx.restore();
+    }, 256, 256);
+    this.tex.glass.wrapS = this.tex.glass.wrapT = THREE.ClampToEdgeWrapping;
 
     this.tex.neonSign = texCanvas((ctx, w, h) => {
       ctx.clearRect(0, 0, w, h);
@@ -234,24 +409,39 @@ export class MenuScene {
       asphalt: new THREE.MeshStandardMaterial({
         map: this.tex.asphalt, color: 0xffffff, roughness: 0.35, metalness: 0.15,
       }),
+      street: new THREE.MeshStandardMaterial({
+        map: this.tex.street,
+        color: 0xffffff,
+        roughness: 0.72,
+        metalness: 0.08,
+      }),
       roof: new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.9 }),
       trim: new THREE.MeshStandardMaterial({ color: 0x3a241c, roughness: 0.85 }),
       awningRed: new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.8 }),
       awningWhite: new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.75 }),
       glass: new THREE.MeshStandardMaterial({
-        color: 0xffa040,
+        map: this.tex.glass,
+        color: 0xffffff,
         emissive: 0xff7018,
-        emissiveIntensity: 2.45,
+        emissiveMap: this.tex.glass,
+        emissiveIntensity: 1.85,
         transparent: true,
-        opacity: 0.95,
-        roughness: 0.12,
-        metalness: 0.3,
+        opacity: 0.98,
+        roughness: 0.08,
+        metalness: 0.55,
       }),
       glassGlow: new THREE.MeshBasicMaterial({
         color: 0xff8028,
         transparent: true,
-        opacity: 0.48,
+        opacity: 0.58,
         depthWrite: false,
+      }),
+      glassReflect: new THREE.MeshBasicMaterial({
+        color: 0xff9a40,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }),
       wood: new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.85 }),
       metal: new THREE.MeshStandardMaterial({ color: 0x3a4248, roughness: 0.4, metalness: 0.7 }),
@@ -263,14 +453,18 @@ export class MenuScene {
       foliage: new THREE.MeshStandardMaterial({ color: 0x0e1810, roughness: 1 }),
       car: new THREE.MeshStandardMaterial({ color: 0x5a1010, roughness: 0.45, metalness: 0.3 }),
       wet: new THREE.MeshStandardMaterial({
-        color: 0x221810, roughness: 0.12, metalness: 0.7,
-        transparent: true, opacity: 0.62,
+        color: 0x1a1c22, roughness: 0.18, metalness: 0.55,
+        transparent: true, opacity: 0.45,
       }),
       puddleGlow: new THREE.MeshBasicMaterial({
         color: 0xff7818,
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.12,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+      sidewalk: new THREE.MeshStandardMaterial({
+        color: 0x3a3836, roughness: 0.92, metalness: 0.05,
       }),
     };
   }
@@ -293,28 +487,41 @@ export class MenuScene {
     this.neonLight.position.set(0, 5.2, 2.8);
     this.root.add(this.neonLight);
 
-    this.interiorLight = new THREE.PointLight(0xff7a20, 6.2, 18);
+    this.interiorLight = new THREE.PointLight(0xff7a20, 7.4, 20);
     this.interiorLight.position.set(0, 1.9, 1.2);
     this.root.add(this.interiorLight);
 
     // Derrame cálido desde cada vano (fachada + reflejo en suelo)
     this.windowLights = [
-      [-3.2, 2.0, 3.75],
-      [3.2, 2.0, 3.75],
-      [0, 1.7, 3.8],
+      [-3.2, 2.0, 3.85],
+      [3.2, 2.0, 3.85],
+      [0, 1.4, 3.9],
     ].map(([x, y, z]) => {
-      const pl = new THREE.PointLight(0xff7018, 4.2, 7.5);
+      const pl = new THREE.PointLight(0xff7018, 6.4, 9.5);
       pl.position.set(x, y, z);
       this.root.add(pl);
       return pl;
     });
 
-    this.groundWash = [
-      [-3.2, 0.35, 4.6],
-      [3.2, 0.35, 4.6],
-      [0, 0.35, 4.7],
+    // Luces internas detrás del cristal (más “volumen” naranja)
+    this.windowBackLights = [
+      [-3.2, 1.85, 2.6],
+      [3.2, 1.85, 2.6],
+      [0, 1.35, 2.5],
     ].map(([x, y, z]) => {
-      const pl = new THREE.PointLight(0xff6810, 2.6, 4.2);
+      const pl = new THREE.PointLight(0xff8a28, 5.2, 6.5);
+      pl.position.set(x, y, z);
+      this.root.add(pl);
+      return pl;
+    });
+
+    // Lavado suave solo junto a la fachada (no tiñe toda la calle)
+    this.groundWash = [
+      [-3.2, 0.35, 4.5],
+      [3.2, 0.35, 4.5],
+      [0, 0.35, 4.6],
+    ].map(([x, y, z]) => {
+      const pl = new THREE.PointLight(0xff8844, 1.4, 3.2);
       pl.position.set(x, y, z);
       this.root.add(pl);
       return pl;
@@ -326,34 +533,44 @@ export class MenuScene {
   }
 
   _buildGround() {
+    // Fondo lejano (asfalto genérico)
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 40), this.mats.asphalt);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(-2, 0, 4);
     this.root.add(ground);
 
+    // Estacionamiento delante del establecimiento (una sola fila hacia la fachada)
+    const street = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), this.mats.street);
+    street.rotation.x = -Math.PI / 2;
+    street.position.set(0, 0.01, 7.4);
+    this.root.add(street);
+    this.streetMesh = street;
+
     // Capa húmeda que recoge el neón / interior
-    const wet = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), this.mats.wet);
+    const wet = new THREE.Mesh(new THREE.PlaneGeometry(20, 12), this.mats.wet);
     wet.rotation.x = -Math.PI / 2;
-    wet.position.set(0, 0.02, 5.5);
+    wet.position.set(0, 0.025, 7.2);
     this.root.add(wet);
 
-    // Charcos luminosos bajo ventanas / puerta
+    // Reflejo mínimo justo bajo los vanos (no toda la calle)
     [
-      [-3.2, 3.2, 1.1],
-      [3.2, 3.2, 1.1],
-      [0, 3.6, 0.85],
+      [-3.2, 4.2, 1.0],
+      [3.2, 4.2, 1.0],
+      [0, 4.4, 0.75],
     ].forEach(([x, z, w]) => {
       const puddle = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, 2.8),
+        new THREE.PlaneGeometry(w, 1.8),
         this.mats.puddleGlow,
       );
       puddle.rotation.x = -Math.PI / 2;
-      puddle.position.set(x, 0.035, z);
+      puddle.position.set(x, 0.04, z);
       this.root.add(puddle);
     });
 
-    // Acera
-    this.box(14, 0.08, 3.2, this.mats.trim, 0, 0.04, 3.2);
+    // Acera frente a la fachada
+    this.box(14, 0.1, 3.4, this.mats.sidewalk, 0, 0.05, 3.35);
+    // Bordillo
+    this.box(14.2, 0.16, 0.22, this.mats.trim, 0, 0.08, 5.05);
   }
 
   _buildSky() {
@@ -392,32 +609,55 @@ export class MenuScene {
     // Marco ventanas / puerta
     this.box(11.5, 2.4, 0.15, this.mats.trim, 0, 1.8, 3.48, g);
 
-    // Cristales con glow interior cálido
+    // Cristales con glow interior cálido + reflejo naranja
     this.windowL = this.box(3.4, 2.0, 0.08, this.mats.glass, -3.2, 1.85, 3.55, g);
     this.windowR = this.box(3.4, 2.0, 0.08, this.mats.glass, 3.2, 1.85, 3.55, g);
-    this.doorGlass = this.box(1.6, 2.3, 0.08, this.mats.glass, 0, 1.55, 3.56, g);
+    // Puerta a ras de suelo (centro 1.35 → base en y≈0)
+    this.doorGlass = this.box(1.6, 2.7, 0.08, this.mats.glass, 0, 1.35, 3.56, g);
 
     // Halo suave delante del cristal (más brillo / “bloom” barato)
     this.windowHalos = [
-      [-3.2, 1.85, 3.4, 2.0],
-      [3.2, 1.85, 3.4, 2.0],
-      [0, 1.55, 2.0, 2.35],
+      [-3.2, 1.85, 3.55, 2.15],
+      [3.2, 1.85, 3.55, 2.15],
+      [0, 1.35, 1.75, 2.75],
     ].map(([x, y, w, h]) => {
       const halo = new THREE.Mesh(
         new THREE.PlaneGeometry(w, h),
-        this.mats.glassGlow,
+        this.mats.glassGlow.clone(),
       );
       halo.position.set(x, y, 3.62);
       g.add(halo);
       return halo;
     });
 
-    // Marcos verticales
-    [-5.0, -1.4, 1.4, 5.0].forEach((x) => {
+    // Capa de reflejo naranja aditiva sobre ventanas y puerta
+    this.windowReflects = [
+      [-3.2, 1.85, 3.3, 1.9],
+      [3.2, 1.85, 3.3, 1.9],
+      [0, 1.35, 1.45, 2.6],
+    ].map(([x, y, w, h]) => {
+      const refl = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        this.mats.glassReflect.clone(),
+      );
+      refl.position.set(x, y, 3.66);
+      g.add(refl);
+      return refl;
+    });
+
+    // Marcos verticales (jambas de puerta hasta el suelo)
+    [-5.0, 5.0].forEach((x) => {
       this.box(0.18, 2.3, 0.2, this.mats.trim, x, 1.8, 3.52, g);
     });
+    [-1.4, 1.4].forEach((x) => {
+      this.box(0.18, 2.7, 0.2, this.mats.trim, x, 1.35, 3.52, g);
+    });
     this.box(11.2, 0.15, 0.2, this.mats.trim, 0, 2.95, 3.52, g);
-    this.box(11.2, 0.15, 0.2, this.mats.trim, 0, 0.75, 3.52, g);
+    // Umbral inferior solo bajo ventanas (no corta la puerta)
+    this.box(3.4, 0.15, 0.2, this.mats.trim, -3.2, 0.75, 3.52, g);
+    this.box(3.4, 0.15, 0.2, this.mats.trim, 3.2, 0.75, 3.52, g);
+    // Umbral de la puerta a ras de suelo
+    this.box(1.7, 0.08, 0.28, this.mats.trim, 0, 0.04, 3.58, g);
 
     // Cartel ABIERTO
     const openTex = texCanvas((ctx, w, h) => {
@@ -626,7 +866,98 @@ export class MenuScene {
     this.active = !!on;
     this.canvas.style.opacity = on ? "1" : "0";
     this.canvas.style.pointerEvents = "none";
-    if (on) this.resize();
+    if (on) {
+      this.resize();
+      if (!this.entering) this.resetCamera();
+    }
+  }
+
+  resetCamera() {
+    this.entering = false;
+    this._enterAnim = null;
+    this.camera.fov = this._camFovBase;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.copy(this._camBase);
+    this._look.set(5.8, 1.85, -0.4);
+    this.camera.lookAt(this._look);
+  }
+
+  /**
+   * Acercamiento cinematográfico a la puerta.
+   * Resuelve la Promise al terminar (o de inmediato si ya está entrando).
+   */
+  playEnterAnimation(duration = 2.75) {
+    if (this._enterAnim) {
+      return new Promise((resolve) => {
+        const prev = this._enterAnim.resolve;
+        this._enterAnim.resolve = () => {
+          prev?.();
+          resolve();
+        };
+      });
+    }
+
+    this.root.updateMatrixWorld(true);
+    const doorPos = new THREE.Vector3();
+    if (this.doorGlass) this.doorGlass.getWorldPosition(doorPos);
+    else doorPos.set(5.8, 1.35, 2.0);
+
+    const outward = new THREE.Vector3(0, 0, 1).transformDirection(this.root.matrixWorld);
+    outward.y = 0;
+    if (outward.lengthSq() < 1e-6) outward.set(0, 0, 1);
+    else outward.normalize();
+
+    const toLook = doorPos.clone();
+    toLook.y = 1.4;
+
+    // Frente a la puerta, un poco más bajo (como caminar hacia ella)
+    const toPos = doorPos.clone().addScaledVector(outward, 2.15);
+    toPos.y = 1.48;
+
+    // Punto intermedio: centra la fachada antes del close-up
+    const midPos = this.camera.position.clone().lerp(toPos, 0.45);
+    midPos.y = Math.max(midPos.y, 2.05);
+    const midLook = this._look.clone().lerp(toLook, 0.55);
+
+    return new Promise((resolve) => {
+      this.entering = true;
+      this._enterAnim = {
+        t: 0,
+        dur: duration,
+        fromPos: this.camera.position.clone(),
+        midPos,
+        toPos,
+        fromLook: this._look.clone(),
+        midLook,
+        toLook,
+        fromFov: this.camera.fov,
+        toFov: 36,
+        resolve,
+      };
+    });
+  }
+
+  _easeInOutCubic(u) {
+    return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+  }
+
+  _sampleEnterPath(u) {
+    // Dos segmentos: panorama → puerta
+    const a = this._enterAnim;
+    if (u < 0.55) {
+      const t = this._easeInOutCubic(u / 0.55);
+      return {
+        pos: a.fromPos.clone().lerp(a.midPos, t),
+        look: a.fromLook.clone().lerp(a.midLook, t),
+        fov: a.fromFov + (42 - a.fromFov) * t,
+      };
+    }
+    const t = this._easeInOutCubic((u - 0.55) / 0.45);
+    return {
+      pos: a.midPos.clone().lerp(a.toPos, t),
+      look: a.midLook.clone().lerp(a.toLook, t),
+      fov: 42 + (a.toFov - 42) * t,
+    };
   }
 
   _placeMoon() {
@@ -653,15 +984,34 @@ export class MenuScene {
     if (!this.active) return;
     this.t += dt;
 
-    // Parallax sutil con el ratón
-    const tx = this._camBase.x + (this.pointerX - 0.5) * 1.35;
-    const ty = this._camBase.y + (0.5 - this.pointerY) * 0.55;
-    const k = Math.min(1, dt * 2.5);
-    this.camera.position.x += (tx - this.camera.position.x) * k;
-    this.camera.position.y += (ty - this.camera.position.y) * k;
-    this._look.x = 5.8 + (this.pointerX - 0.5) * 0.45;
-    this._look.y = 1.85 + (0.5 - this.pointerY) * 0.28;
-    this.camera.lookAt(this._look);
+    if (this.entering && this._enterAnim) {
+      const anim = this._enterAnim;
+      anim.t += dt;
+      const u = Math.min(1, anim.t / anim.dur);
+      const sample = this._sampleEnterPath(u);
+      this.camera.position.copy(sample.pos);
+      this._look.copy(sample.look);
+      this.camera.fov = sample.fov;
+      this.camera.updateProjectionMatrix();
+      this.camera.lookAt(this._look);
+
+      if (u >= 1) {
+        const done = anim.resolve;
+        this._enterAnim = null;
+        this.entering = false;
+        done?.();
+      }
+    } else {
+      // Parallax sutil con el ratón
+      const tx = this._camBase.x + (this.pointerX - 0.5) * 1.35;
+      const ty = this._camBase.y + (0.5 - this.pointerY) * 0.55;
+      const k = Math.min(1, dt * 2.5);
+      this.camera.position.x += (tx - this.camera.position.x) * k;
+      this.camera.position.y += (ty - this.camera.position.y) * k;
+      this._look.x = 5.8 + (this.pointerX - 0.5) * 0.45;
+      this._look.y = 1.85 + (0.5 - this.pointerY) * 0.28;
+      this.camera.lookAt(this._look);
+    }
 
     // Neón parpadea
     const flicker = Math.random() > 0.97 ? 0.4 : 1;
@@ -673,24 +1023,33 @@ export class MenuScene {
       this.crescent.material.opacity = 0.85 + pulse * 0.15 * flicker;
     }
     if (this.mats.glass) {
-      this.mats.glass.emissiveIntensity = 2.05 + Math.sin(this.t * 1.5) * 0.22;
+      this.mats.glass.emissiveIntensity = 1.7 + Math.sin(this.t * 1.5) * 0.28;
     }
-    if (this.mats.glassGlow) {
-      this.mats.glassGlow.opacity = 0.36 + Math.sin(this.t * 1.5) * 0.08;
+    if (this.windowHalos) {
+      const hop = 0.48 + Math.sin(this.t * 1.5) * 0.1;
+      for (const h of this.windowHalos) h.material.opacity = hop;
+    }
+    if (this.windowReflects) {
+      const rop = 0.22 + Math.sin(this.t * 1.8) * 0.08;
+      for (const r of this.windowReflects) r.material.opacity = rop;
     }
     if (this.mats.puddleGlow) {
-      this.mats.puddleGlow.opacity = 0.22 + Math.sin(this.t * 1.5) * 0.06;
+      this.mats.puddleGlow.opacity = 0.1 + Math.sin(this.t * 1.5) * 0.03;
     }
     if (this.windowLights) {
-      const wPulse = 3.8 + Math.sin(this.t * 1.5) * 0.35;
+      const wPulse = 5.8 + Math.sin(this.t * 1.5) * 0.55;
       for (const pl of this.windowLights) pl.intensity = wPulse;
     }
+    if (this.windowBackLights) {
+      const bPulse = 4.6 + Math.sin(this.t * 1.35) * 0.4;
+      for (const pl of this.windowBackLights) pl.intensity = bPulse;
+    }
     if (this.groundWash) {
-      const gPulse = 2.3 + Math.sin(this.t * 1.5) * 0.25;
+      const gPulse = 1.2 + Math.sin(this.t * 1.5) * 0.15;
       for (const pl of this.groundWash) pl.intensity = gPulse;
     }
     if (this.interiorLight) {
-      this.interiorLight.intensity = 5.8 + Math.sin(this.t * 1.2) * 0.4;
+      this.interiorLight.intensity = 7.0 + Math.sin(this.t * 1.2) * 0.5;
     }
 
     // Niebla lenta
