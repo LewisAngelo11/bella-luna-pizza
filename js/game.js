@@ -403,7 +403,7 @@ export class Game {
         this.freezerAutoPhase = null;
         this.freezerAutoTimer = 0;
         this.freezerAutoCloseIn = -1;
-        this.freezerAutoNextIn = 35 + Math.random() * 50;
+        this.freezerAutoNextIn = this.nextFreezerAutoDelay();
         this.showBanner("Cierras el congelador a tiempo. El frío se queda dentro.");
       } else {
         this.showBanner("Cierras el congelador. Mejor así.");
@@ -420,7 +420,7 @@ export class Game {
       // Encender (cancela emergencia si venía de apagón solo)
       this.ovenOn = true;
       this.ovenOffDeadline = 0;
-      this.ovenEventTimer = 40 + Math.random() * 55;
+      this.ovenEventTimer = this.nextOvenDelay();
       this.renderer.setOvenOn(true);
       this.showBanner(
         fromClick
@@ -447,7 +447,7 @@ export class Game {
       // Tras cerrar de madrugada, puede volver a abrirse sola más tarde
       const hour = this.getDisplayHour();
       if (hour >= 2 && hour < 6) {
-        this.doorAutoNextIn = 20 + Math.random() * 40;
+        this.doorAutoNextIn = this.nextDoorAutoDelay(true);
       }
       this.showBanner("Cierras la puerta trasera y echas el cerrojo.");
     } else {
@@ -479,19 +479,37 @@ export class Game {
     const pastMidnight = hour >= 0 && hour < 6;
     const beforeMidnight = hour >= 22 && hour < 24;
     const isDeepNight = pastMidnight || hour >= 23;
+    const calm = this.isCalmHour();
+    const witching = this.isWitchingHour();
 
-    const anomalyChance = 0.3 + (isDeepNight ? 0.28 : 0) + this.fear * 0.002;
-    let customer;
-
-    if (Math.random() < anomalyChance) {
-      const pool = ANOMALIES.filter((a) => {
+    const anomalyPool = () =>
+      ANOMALIES.filter((a) => {
         if (a.requiresAfterMidnight && !pastMidnight) return false;
         if (a.requiresBeforeMidnight && !beforeMidnight) return false;
         return true;
       });
+
+    let customer;
+
+    if (calm) {
+      // 22:00–23:00: solo clientes normales
+      const pick = NORMAL_CUSTOMERS[Math.floor(Math.random() * NORMAL_CUSTOMERS.length)];
+      customer = { ...pick, anomaly: false };
+    } else if (witching) {
+      // 03:00–04:00: solo anomalías
+      const pool = anomalyPool();
       if (pool.length) {
         const pick = pool[Math.floor(Math.random() * pool.length)];
         customer = { ...pick, anomaly: true };
+      }
+    } else {
+      const anomalyChance = 0.3 + (isDeepNight ? 0.28 : 0) + this.fear * 0.002;
+      if (Math.random() < anomalyChance) {
+        const pool = anomalyPool();
+        if (pool.length) {
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          customer = { ...pick, anomaly: true };
+        }
       }
     }
 
@@ -504,7 +522,11 @@ export class Game {
     this.renderer.setCustomer(customer);
     this.showCustomerUI(customer);
     this.audio.customerEnter();
-    this.showBanner("Alguien se acerca al mostrador…");
+    this.showBanner(
+      witching
+        ? "Algo entra… no parece un cliente cualquiera."
+        : "Alguien se acerca al mostrador…"
+    );
   }
 
   showCustomerUI(customer) {
@@ -564,7 +586,7 @@ export class Game {
     this.currentCustomer = null;
     this.renderer.setCustomer(null);
     this.hideCustomerPanel();
-    this.customerQueueTimer = 10 + Math.random() * 14;
+    this.customerQueueTimer = this.nextCustomerDelay();
   }
 
   startPhone() {
@@ -632,6 +654,53 @@ export class Game {
     let m = this.timeMinutes;
     if (m >= 24 * 60) m -= 24 * 60;
     return m / 60;
+  }
+
+  /** 22:00–23:00: solo clientes normales, sin rarezas ambientales */
+  isCalmHour() {
+    return this.getDisplayHour() === 22;
+  }
+
+  /** 03:00–04:00: solo anomalías + presión ambiental alta */
+  isWitchingHour() {
+    return this.getDisplayHour() === 3;
+  }
+
+  /** Multiplicador de cadencia de eventos raros (solo afecta countdowns) */
+  eventPressure() {
+    return this.isWitchingHour() ? 2.6 : 1;
+  }
+
+  /** Intervalos más cortos en la hora bruja */
+  nextFlickerDelay() {
+    return this.isWitchingHour()
+      ? 8 + Math.random() * 12
+      : 30 + Math.random() * 45;
+  }
+
+  nextOvenDelay() {
+    return this.isWitchingHour()
+      ? 10 + Math.random() * 16
+      : 40 + Math.random() * 55;
+  }
+
+  nextFreezerAutoDelay() {
+    return this.isWitchingHour()
+      ? 8 + Math.random() * 14
+      : 35 + Math.random() * 50;
+  }
+
+  nextDoorAutoDelay(afterManualClose = false) {
+    if (this.isWitchingHour()) {
+      return afterManualClose ? 6 + Math.random() * 12 : 4 + Math.random() * 10;
+    }
+    return afterManualClose ? 20 + Math.random() * 40 : 12 + Math.random() * 28;
+  }
+
+  nextCustomerDelay() {
+    return this.isWitchingHour()
+      ? 4 + Math.random() * 6
+      : 10 + Math.random() * 14;
   }
 
   updateClockUI() {
@@ -725,14 +794,16 @@ export class Game {
     // Puerta trasera después de 02:00
     const hour = this.getDisplayHour();
     const past2 = hour >= 2 && hour < 6;
+    const calm = this.isCalmHour();
+    const pressure = this.eventPressure();
 
-    // A partir de las 02:00 puede abrirse sola
+    // A partir de las 02:00 puede abrirse sola (más a menudo 03:00–04:00)
     if (past2) {
       if (this.doorLocked) {
         if (this.doorAutoNextIn <= 0) {
-          this.doorAutoNextIn = 12 + Math.random() * 28;
+          this.doorAutoNextIn = this.nextDoorAutoDelay(false);
         } else {
-          this.doorAutoNextIn -= dt;
+          this.doorAutoNextIn -= dt * pressure;
           if (this.doorAutoNextIn <= 0) {
             this.doorLocked = false;
             this.eventCooldown = 0;
@@ -757,10 +828,9 @@ export class Game {
       this.eventCooldown = 0;
     }
 
-    // Congelador
-    // —— Horno: apagón espontáneo ——
-    if (this.ovenOn && this.ovenOffDeadline <= 0) {
-      this.ovenEventTimer -= dt;
+    // —— Horno: apagón espontáneo (pausado 22:00–23:00) ——
+    if (!calm && this.ovenOn && this.ovenOffDeadline <= 0) {
+      this.ovenEventTimer -= dt * pressure;
       if (this.ovenEventTimer <= 0) {
         this.ovenOn = false;
         this.ovenOffDeadline = 5;
@@ -776,9 +846,9 @@ export class Game {
       }
     }
 
-    // —— Congelador: se abre solo ——
-    if (!this.freezerAutoPhase && !this.freezerKnock && !this.freezerOpen) {
-      this.freezerAutoNextIn -= dt;
+    // —— Congelador: se abre solo (pausado 22:00–23:00) ——
+    if (!calm && !this.freezerAutoPhase && !this.freezerKnock && !this.freezerOpen) {
+      this.freezerAutoNextIn -= dt * pressure;
       if (this.freezerAutoNextIn <= 0) {
         this.freezerOpen = true;
         this.renderer.setFreezerOpen(true);
@@ -802,7 +872,7 @@ export class Game {
           this.freezerAutoPhase = null;
           this.freezerAutoTimer = 0;
           this.freezerAutoCloseIn = -1;
-          this.freezerAutoNextIn = 35 + Math.random() * 50;
+          this.freezerAutoNextIn = this.nextFreezerAutoDelay();
           this.showBanner("El congelador se cerró solo. Por ahora.");
         }
       }
@@ -819,8 +889,8 @@ export class Game {
       }
     }
 
-    if (!this.freezerKnock) {
-      this.freezerKnockTimer -= dt;
+    if (!calm && !this.freezerKnock) {
+      this.freezerKnockTimer -= dt * pressure;
       if (this.freezerKnockTimer <= 0) {
         if (this.freezerOpen) {
           // Lo dejaste abierto: lo que golpeaba ya no necesita permiso
@@ -832,24 +902,28 @@ export class Game {
         this.showBanner("…golpes sordos desde el congelador.");
         this.audio.knock();
       }
-    } else {
-      if (Math.random() < 0.04) this.audio.knock();
+    } else if (this.freezerKnock) {
+      if (Math.random() < (this.isWitchingHour() ? 0.08 : 0.04)) this.audio.knock();
       this._knockLeft -= dt;
       if (this._knockLeft <= 0) {
         this.freezerKnock = false;
-        this.freezerKnockTimer = 40 + Math.random() * 50;
+        this.freezerKnockTimer = this.isWitchingHour()
+          ? 12 + Math.random() * 18
+          : 40 + Math.random() * 50;
         this.showBanner("Los golpes cesan. No abras esa puerta.");
       }
     }
 
-    // Flicker de luces
-    this.flickerTimer -= dt;
-    if (this.flickerTimer <= 0 && this.flickerIntensity === 0) {
-      this.flickerIntensity = 1;
-      this.eyesClosedNeeded = true;
-      this._flickerLeft = 3.5 + Math.random() * 1.5;
-      this.showBanner("Las luces parpadean. Cierra los ojos.");
-      this.audio.noiseBurst(0.15, 0.1);
+    // Flicker de luces (pausado 22:00–23:00; más frecuente 03:00–04:00)
+    if (!calm) {
+      this.flickerTimer -= dt * pressure;
+      if (this.flickerTimer <= 0 && this.flickerIntensity === 0) {
+        this.flickerIntensity = 1;
+        this.eyesClosedNeeded = true;
+        this._flickerLeft = 3.5 + Math.random() * 1.5;
+        this.showBanner("Las luces parpadean. Cierra los ojos.");
+        this.audio.noiseBurst(0.15, 0.1);
+      }
     }
     if (this.flickerIntensity > 0) {
       this._flickerLeft -= dt;
@@ -866,7 +940,7 @@ export class Game {
         this.flickerIntensity = 0;
         this.eyesClosedNeeded = false;
         this._flickerUnsafe = 0;
-        this.flickerTimer = 30 + Math.random() * 45;
+        this.flickerTimer = this.nextFlickerDelay();
         if (this.eyesClosed) this.showBanner("Las luces se estabilizan. Puedes abrir los ojos.");
       }
     }
@@ -920,11 +994,17 @@ export class Game {
     } else if (this.freezerKnock) note.textContent = "Algo golpea el metal del congelador…";
     else if (this.flickerIntensity > 0) note.textContent = "El neón chisporrotea.";
     else if (!this.ovenOn) note.textContent = "El horno está apagado.";
+    else if (this.isWitchingHour()) note.textContent = "Las tres. Todo empuja a la vez.";
     else if (hour >= 0 && hour < 4) note.textContent = "La lluvia no debería sonar así.";
+    else if (calm) note.textContent = "Turno tranquilo. Todavía.";
     else note.textContent = "Huele a orégano y a algo más viejo.";
 
     document.getElementById("shift-status").textContent =
-      hour >= 0 && hour < 6 ? "MADRUGADA" : "ABIERTO";
+      this.isWitchingHour()
+        ? "LAS TRES"
+        : hour >= 0 && hour < 6
+          ? "MADRUGADA"
+          : "ABIERTO";
 
     this.renderer.update(dt, {
       flickerIntensity: this.flickerIntensity,
