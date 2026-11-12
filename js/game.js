@@ -141,9 +141,16 @@ export class Game {
       this.audio.click();
       this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
     };
-    document.getElementById("btn-close-eyes").onmousedown = () => this.setEyesClosed(true);
-    document.getElementById("btn-close-eyes").onmouseup = () => this.setEyesClosed(false);
-    document.getElementById("btn-close-eyes").onmouseleave = () => this.setEyesClosed(false);
+    const eyesBtn = document.getElementById("btn-close-eyes");
+    const eyesOn = (e) => {
+      e.preventDefault();
+      this.setEyesClosed(true);
+    };
+    const eyesOff = () => this.setEyesClosed(false);
+    eyesBtn.addEventListener("pointerdown", eyesOn);
+    eyesBtn.addEventListener("pointerup", eyesOff);
+    eyesBtn.addEventListener("pointercancel", eyesOff);
+    eyesBtn.addEventListener("pointerleave", eyesOff);
 
     document.querySelectorAll("[data-phone]").forEach((btn) => {
       btn.onclick = () => this.handlePhone(btn.dataset.phone);
@@ -181,6 +188,41 @@ export class Game {
       this.audio.click();
       this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
     });
+
+    this.bindLookPad();
+  }
+
+  /** En touch/móvil, el look lo llevan las flechas (el ratón en desktop sigue igual). */
+  prefersButtonLook() {
+    return window.matchMedia("(pointer: coarse)").matches;
+  }
+
+  bindLookPad() {
+    const pad = document.getElementById("look-pad");
+    if (!pad) return;
+
+    const clear = () => this.renderer?.clearLookHold();
+
+    pad.querySelectorAll("[data-look-x]").forEach((btn) => {
+      const apply = (e) => {
+        if (!this.playing || this.paused) return;
+        e.preventDefault();
+        try {
+          btn.setPointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        const x = Number(btn.dataset.lookX) || 0;
+        const y = Number(btn.dataset.lookY) || 0;
+        this.renderer.setLookHold(x, y);
+      };
+      btn.addEventListener("pointerdown", apply);
+      btn.addEventListener("pointerup", clear);
+      btn.addEventListener("pointercancel", clear);
+      btn.addEventListener("lostpointercapture", clear);
+    });
+
+    window.addEventListener("blur", clear);
   }
 
   /** Cocina atrás: horno/puerta. Sala al frente: congelador. */
@@ -196,10 +238,12 @@ export class Game {
   }
 
   onPointer(e, click) {
-    this.renderer.setPointer(e.clientX, e.clientY, this.playing && !this.paused);
+    const driveLook = !this.prefersButtonLook();
+    this.renderer.setPointer(e.clientX, e.clientY, this.playing && !this.paused, driveLook);
     if (!this.playing || this.paused) {
       this.lookingTable6 = false;
       this.hoverTable6 = false;
+      this.renderer.clearLookHold();
       return;
     }
     const over = this.renderer.isOverTable6();
@@ -322,6 +366,7 @@ export class Game {
     if (!this.playing || this.paused) return;
     this.paused = true;
     this.setEyesClosed(false);
+    this.renderer?.clearLookHold();
     this.audio?.click?.();
     // Mantener HUD debajo; la pausa se superpone
     document.getElementById("screen-hud").classList.add("active");
@@ -340,6 +385,7 @@ export class Game {
     this.paused = false;
     this.playing = false;
     this.setEyesClosed(false);
+    this.renderer?.clearLookHold();
     this.renderer.setCustomer(null);
     this.hideCustomerPanel();
     this.hidePhone();

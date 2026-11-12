@@ -39,7 +39,8 @@
           <button id="btn-start" class="btn primary">JUGAR</button>
           <button id="btn-rules-preview" class="btn ghost">INSTRUCCIONES</button>
         </div>
-        <p class="hint">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · H: horno · F: congelador · Sobrevive hasta las 6:00.</p>
+        <p class="hint hint-desktop">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · H: horno · F: congelador · Sobrevive hasta las 6:00.</p>
+        <p class="hint hint-touch">Flechas: mirar · Toca para interactuar · «Mirar atrás» para la cocina · Sobrevive hasta las 6:00.</p>
         <p class="menu-version" id="menu-version"></p>
       </div>
     </section>
@@ -143,29 +144,36 @@
       <div id="event-banner" class="event-banner warning-banner hidden" role="alert"></div>
       <div id="info-banner" class="info-banner hidden" role="status"></div>
 
-      <div id="customer-panel" class="customer-panel hidden">
-        <div class="customer-info">
-          <p id="customer-desc"></p>
-          <p id="customer-order" class="order"></p>
+      <div id="look-pad" class="look-pad" aria-label="Controles de cámara">
+        <button type="button" class="look-btn look-left" data-look-x="-1" data-look-y="0" aria-label="Mirar a la izquierda">‹</button>
+        <button type="button" class="look-btn look-right" data-look-x="1" data-look-y="0" aria-label="Mirar a la derecha">›</button>
+      </div>
+
+      <div class="hud-dock">
+        <div id="customer-panel" class="customer-panel hidden">
+          <div class="customer-info">
+            <p id="customer-desc"></p>
+            <p id="customer-order" class="order"></p>
+          </div>
+          <div id="action-buttons" class="actions"></div>
         </div>
-        <div id="action-buttons" class="actions"></div>
-      </div>
 
-      <div id="phone-ui" class="phone-ui hidden">
-        <p>☎ El teléfono suena… <span id="ring-count">1</span></p>
-        <button data-phone="answer" class="btn small">Contestar</button>
-        <button data-phone="hang" class="btn small danger">Colgar</button>
-      </div>
+        <div id="phone-ui" class="phone-ui hidden">
+          <p>☎ El teléfono suena… <span id="ring-count">1</span></p>
+          <button data-phone="answer" class="btn small">Contestar</button>
+          <button data-phone="hang" class="btn small danger">Colgar</button>
+        </div>
 
-      <footer class="hud-bottom">
-        <button id="btn-toggle-rules" class="btn small ghost">Reglamento [R]</button>
-        <button id="btn-check-freezer" class="btn small">Congelador [F / click]</button>
-        <button id="btn-toggle-oven" class="btn small hidden">Horno [H / click]</button>
-        <button id="btn-lock-door" class="btn small hidden">Puerta [D / click]</button>
-        <button id="btn-look-back" class="btn small ghost">Mirar atrás [Click der.]</button>
-        <button id="btn-close-eyes" class="btn small">Cerrar ojos [Espacio]</button>
-        <span id="ambient-note"></span>
-      </footer>
+        <footer class="hud-bottom">
+          <button id="btn-toggle-rules" class="btn small ghost">Reglamento [R]</button>
+          <button id="btn-check-freezer" class="btn small">Congelador [F / click]</button>
+          <button id="btn-toggle-oven" class="btn small hidden">Horno [H / click]</button>
+          <button id="btn-lock-door" class="btn small hidden">Puerta [D / click]</button>
+          <button id="btn-look-back" class="btn small ghost">Mirar atrás [Click der.]</button>
+          <button id="btn-close-eyes" class="btn small">Cerrar ojos [Espacio]</button>
+          <span id="ambient-note"></span>
+        </footer>
+      </div>
 
       <div id="eyes-closed" class="eyes-closed hidden">
         <p>Ojos cerrados…</p>

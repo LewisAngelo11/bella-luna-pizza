@@ -33,6 +33,8 @@ export class Renderer {
     this.pitch = 0;
     this.targetYaw = 0;
     this.targetPitch = 0;
+    this.lookHoldX = 0;
+    this.lookHoldY = 0;
     this.baseYaw = 0;
     this.targetBaseYaw = 0;
     this.freezerDoorAngle = 0;
@@ -146,15 +148,36 @@ export class Renderer {
     this.ovenOn = !!on;
   }
 
-  setPointer(clientX, clientY, enabled) {
+  setLookHold(x = 0, y = 0) {
+    this.lookHoldX = Math.max(-1, Math.min(1, x)) || 0;
+    this.lookHoldY = Math.max(-1, Math.min(1, y)) || 0;
+    if (this.lookHoldX || this.lookHoldY) this.lookEnabled = true;
+  }
+
+  clearLookHold() {
+    this.lookHoldX = 0;
+    this.lookHoldY = 0;
+  }
+
+  maxLookYaw() {
+    return this.lookingBehind ? 0.4 : 0.55;
+  }
+
+  maxLookPitch() {
+    return 0.28;
+  }
+
+  setPointer(clientX, clientY, enabled, driveLook = true) {
     this.lookEnabled = enabled;
     this.pointerX = clientX / this.w;
     this.pointerY = clientY / this.h;
-    const maxYaw = this.lookingBehind ? 0.4 : 0.55;
-    const maxPitch = 0.28;
+    this.pick(clientX, clientY);
+    if (!enabled || !driveLook) return;
+    if (this.lookHoldX || this.lookHoldY) return;
+    const maxYaw = this.maxLookYaw();
+    const maxPitch = this.maxLookPitch();
     this.targetYaw = (this.pointerX - 0.5) * 2 * maxYaw;
     this.targetPitch = (0.5 - this.pointerY) * 2 * maxPitch;
-    this.pick(clientX, clientY);
   }
 
   pick(clientX, clientY) {

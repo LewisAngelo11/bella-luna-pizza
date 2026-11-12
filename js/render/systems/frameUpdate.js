@@ -9,6 +9,21 @@ export function updateFrame(r, dt, state) {
     else r.table6Stare = Math.max(0, r.table6Stare - dt * 2);
 
     r.baseYaw += (r.targetBaseYaw - r.baseYaw) * Math.min(1, dt * 5);
+
+    if (r.lookHoldX || r.lookHoldY) {
+      const maxYaw = r.maxLookYaw();
+      const maxPitch = r.maxLookPitch();
+      const speed = 1.75;
+      r.targetYaw = Math.max(-maxYaw, Math.min(maxYaw, r.targetYaw + r.lookHoldX * speed * dt));
+      r.targetPitch = Math.max(-maxPitch, Math.min(maxPitch, r.targetPitch + r.lookHoldY * speed * dt));
+      r.lookEnabled = true;
+    } else {
+      const maxYaw = r.maxLookYaw();
+      const maxPitch = r.maxLookPitch();
+      r.targetYaw = Math.max(-maxYaw, Math.min(maxYaw, r.targetYaw));
+      r.targetPitch = Math.max(-maxPitch, Math.min(maxPitch, r.targetPitch));
+    }
+
     if (r.lookEnabled) {
       r.yaw += (r.targetYaw - r.yaw) * Math.min(1, dt * 8);
       r.pitch += (r.targetPitch - r.pitch) * Math.min(1, dt * 8);
