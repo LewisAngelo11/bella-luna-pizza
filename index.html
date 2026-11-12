@@ -8,7 +8,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Special+Elite&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
-  <script src="./vendor/babylon.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="app">
@@ -17,9 +23,9 @@
     <div id="vignette"></div>
     <div id="blood-flash"></div>
 
-    <!-- MENÚ (texto izq · fachada 3D der) -->
+    <!-- MENÚ -->
     <section id="screen-menu" class="screen active">
-      <div class="menu-veil"></div>
+      <div class="menu-bg"></div>
       <div class="menu-content">
         <p class="eyebrow">Turno nocturno · Contrato temporal</p>
         <h1>BELLA LUNA<br /><span>PIZZA</span></h1>
@@ -27,14 +33,9 @@
           El sueldo es bueno. Las reglas son raras.<br />
           Si las rompes… no habrá segundo turno.
         </p>
-        <div class="menu-actions">
-          <button id="btn-start" class="btn primary menu-btn">JUGAR</button>
-          <button id="btn-rules-preview" class="btn ghost menu-btn">REGLAS</button>
-          <!-- <button id="btn-menu-quit" class="btn ghost menu-btn">SALIR</button> -->
-        </div>
-        <p class="hint">Ratón: mirar la fachada · Sobrevive hasta las 6:00.</p>
-        <p id="menu-quit-tip" class="menu-quit-tip hidden">Puedes cerrar esta pestaña cuando quieras.</p>
-        <p id="menu-version" class="menu-version">v0.3.0</p>
+        <button id="btn-start" class="btn primary">Firmar contrato</button>
+        <button id="btn-rules-preview" class="btn ghost">Leer la carta</button>
+        <p class="hint">Ratón: mirar · Click: interactuar · Click derecho: girar atrás · Sobrevive hasta las 6:00.</p>
       </div>
     </section>
 
@@ -187,6 +188,6 @@
     </section>
   </div>
 
-  <script type="module" src="js/main.js?v=menu-win18"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
