@@ -965,8 +965,8 @@ export class MenuScene {
     const z = 14;
     const halfH = Math.tan((this.camera.fov * Math.PI) / 360) * z;
     const halfW = halfH * this.camera.aspect;
-    const size = Math.min(halfW, halfH) * 0.85;
-    this.moonMesh.position.set(halfW * 0.74, halfH * 0.7, -z);
+    const size = Math.min(halfW, halfH) * 0.78;
+    this.moonMesh.position.set(halfW * 0.9, halfH * 0.86, -z);
     this.moonMesh.userData.baseScale = size;
     this.moonMesh.scale.set(size, size, 1);
   }

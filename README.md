@@ -11,11 +11,16 @@
 </p>
 
 <p align="center">
+  <a href="https://bella-luna-pizza.nightowlstudio.workers.dev/"><strong>▶ Jugar gratis</strong></a> ·
+  <a href="#demostración">Demostración</a> ·
   <a href="#cómo-jugar">Cómo jugar</a> ·
   <a href="#controles">Controles</a> ·
   <a href="#reglamento">Reglamento</a> ·
-  <a href="#mecánicas">Mecánicas</a> ·
-  <a href="#desarrollo">Desarrollo</a>
+  <a href="#mecánicas">Mecánicas</a>
+</p>
+
+<p align="center">
+  <a href="https://bella-luna-pizza.nightowlstudio.workers.dev/">https://bella-luna-pizza.nightowlstudio.workers.dev/</a>
 </p>
 
 ---
@@ -30,13 +35,48 @@ Es un survival horror en primera persona, ligero y jugable en el navegador: atie
 - **Género:** horror / reglas / atención
 - **Plataforma:** navegador (HTML · CSS · JavaScript · Three.js)
 - **Idioma:** español
-- **Versión:** v0.9.0
+- **Versión:** v0.9.8
+- **Jugar gratis:** [bella-luna-pizza.nightowlstudio.workers.dev](https://bella-luna-pizza.nightowlstudio.workers.dev/)
 
 Inspirado en juegos de “sigue las reglas” (tipo *No, I’m not a Human*, *Iron Lung* atmosférico, etc.), pero con sabor a pizzería de barrio a las tres de la madrugada.
 
 ---
 
+## Demostración
+
+Capturas del turno nocturno en Bella Luna Pizza:
+
+<p align="center">
+  <img src="assets/demo-menu.jpg" alt="Menú principal — Bella Luna Pizza bajo la luna" width="720" /><br />
+  <em>Menú principal — turno nocturno · contrato temporal</em>
+</p>
+
+<p align="center">
+  <img src="assets/demo-mostrador.jpg" alt="Vista del mostrador al inicio del turno" width="720" /><br />
+  <em>Vista del mostrador — HORA, CORDURA y el local en silencio</em>
+</p>
+
+<p align="center">
+  <img src="assets/demo-cliente.jpg" alt="Atendiendo a un cliente en el mostrador" width="720" /><br />
+  <em>Cliente en el mostrador — decide si servir, rechazar o seguir la regla correcta</em>
+</p>
+
+<p align="center">
+  <img src="assets/demo-horno.jpg" alt="Vista del horno y la cocina" width="720" /><br />
+  <em>Cocina / horno — el fuego no debe apagarse</em>
+</p>
+
+---
+
 ## Cómo jugar
+
+### Probar online (gratis)
+
+Abre el juego en el navegador:
+
+**[https://bella-luna-pizza.nightowlstudio.workers.dev/](https://bella-luna-pizza.nightowlstudio.workers.dev/)**
+
+No requiere instalación.
 
 ### Requisitos
 
@@ -178,7 +218,7 @@ Sin bundler ni framework: clona, sirve estático y listo.
 bella-luna-pizza/
 ├── index.html              # Entrada + pantallas UI
 ├── css/style.css           # Estilos
-├── assets/                 # Iconos / favicon / logo
+├── assets/                 # Iconos, favicon y capturas de demostración
 ├── vendor/three.module.js  # Three.js vendoreado
 ├── js/
 │   ├── main.js             # Boot
