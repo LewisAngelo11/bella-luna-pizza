@@ -967,16 +967,22 @@ export class MenuScene {
     );
   }
 
-  /** Desktop: local a la derecha. Móvil: preview más al centro. */
+  _isMobileLandscape() {
+    return this._isMobileMenu() && window.matchMedia("(orientation: landscape)").matches;
+  }
+
+  /** Desktop / móvil landscape: local a la derecha. Retrato: más al centro. */
   _syncMenuFraming() {
-    if (this._isMobileMenu()) {
+    if (this._isMobileLandscape() || !this._isMobileMenu()) {
+      // Perspectiva similar a desktop
+      this._camBase.set(-3.2, 2.55, 11.4);
+      this._lookBase.set(6, 1.85, -0.5);
+      this.root.position.set(10.2, 0, -1.8);
+    } else {
+      // Retrato: preview más centrado
       this._camBase.set(-9.2, 2.55, 11.2);
       this._lookBase.set(4.4, 1.85, -0.4);
       this.root.position.set(4.2, 0, -1.8);
-    } else {
-      this._camBase.set(-6.2, 2.55, 11.4);
-      this._lookBase.set(6, 1.85, -0.5);
-      this.root.position.set(10.2, 0, -1.8);
     }
   }
 
