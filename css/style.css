@@ -495,12 +495,78 @@ body:has(#screen-menu.entering) #vignette {
   margin-bottom: 0.8rem;
 }
 
+/* Hoja de reglamento: tamaño fijo (página grande) + textura de libreta vieja */
+.rules-paper {
+  display: flex;
+  flex-direction: column;
+  height: min(52rem, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 1.5rem));
+  max-height: min(88vh, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 1.5rem));
+  overflow: hidden;
+  padding: 1.75rem 2.9rem 1.8rem;
+  /* Libreta envejecida: líneas, margen rojo, manchas y arrugas */
+  background-color: #e6d5b0;
+  background-image:
+    radial-gradient(ellipse 120% 80% at 12% 8%, rgba(255, 250, 235, 0.55), transparent 42%),
+    radial-gradient(ellipse 90% 70% at 88% 18%, rgba(140, 100, 55, 0.16), transparent 48%),
+    radial-gradient(ellipse 70% 55% at 70% 88%, rgba(90, 55, 25, 0.14), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 25% 55%, rgba(120, 70, 30, 0.1), transparent 55%),
+    linear-gradient(
+      108deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.07) 18%,
+      transparent 22%,
+      transparent 58%,
+      rgba(80, 50, 20, 0.08) 72%,
+      transparent 78%
+    ),
+    linear-gradient(
+      90deg,
+      transparent 2.65rem,
+      rgba(170, 45, 40, 0.38) 2.65rem,
+      rgba(170, 45, 40, 0.38) calc(2.65rem + 1.5px),
+      transparent calc(2.65rem + 1.5px)
+    ),
+    repeating-linear-gradient(
+      transparent 0,
+      transparent 1.58rem,
+      rgba(70, 95, 130, 0.2) 1.58rem,
+      rgba(70, 95, 130, 0.2) calc(1.58rem + 1px)
+    ),
+    linear-gradient(165deg, #f0e2c4 0%, #e2cfa8 45%, #d2bc92 100%);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    inset 0 0 60px rgba(100, 70, 30, 0.18),
+    inset 0 1px 0 rgba(255, 250, 230, 0.35);
+  border-color: #a89068;
+}
+
+.rules-paper-top {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.rules-paper #rules-list {
+  /* Reserva altura de la página más larga (8 reglas) */
+  flex: 1 1 auto;
+  min-height: 22.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.rules-paper-bottom {
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+}
+
 .rules-pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;
-  margin: 0 0 1rem;
+  margin: 0 0 0.85rem;
 }
 
 .rules-pager #rules-page-label {

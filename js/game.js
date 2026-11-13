@@ -130,12 +130,20 @@ export class Game {
       this.showScreen("rules");
     };
     document.getElementById("btn-rules-prev").onclick = () => {
-      this.rulesPage = (this.rulesPage ?? 0) - 1;
+      const prev = this.rulesPage ?? 0;
+      this.rulesPage = prev - 1;
       this.renderRulesPage();
+      if (this.rulesPage !== prev) {
+        this.ensureAmbience().then(() => this.audio?.paperFlip?.());
+      }
     };
     document.getElementById("btn-rules-next").onclick = () => {
-      this.rulesPage = (this.rulesPage ?? 0) + 1;
+      const prev = this.rulesPage ?? 0;
+      this.rulesPage = prev + 1;
       this.renderRulesPage();
+      if (this.rulesPage !== prev) {
+        this.ensureAmbience().then(() => this.audio?.paperFlip?.());
+      }
     };
     document.getElementById("btn-close-rules").onclick = () => {
       if (this.paused) {
