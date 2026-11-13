@@ -1064,10 +1064,10 @@ body:has(#screen-menu.entering) #vignette {
     width: 110px;
   }
 
-  /* Avisos compactos: debajo del HUD, más anchos → menos saltos */
+  /* Avisos más abajo: no tapar Abierto / Madrugada */
   .event-banner,
   .warning-banner {
-    top: calc(var(--safe-top) + 7.75rem);
+    top: calc(var(--safe-top) + 9.6rem);
     font-size: 0.68rem;
     letter-spacing: 0.01em;
     padding: 0.4rem 0.75rem;
@@ -1080,21 +1080,62 @@ body:has(#screen-menu.entering) #vignette {
     right: auto;
     bottom: auto;
     width: auto;
-    margin: 0 0.55rem 0.45rem;
-    /* sin scroll en cards normales; solo si el contenido es enorme */
-    max-height: min(70vh, 520px);
+    margin: 0 0.55rem 0.35rem;
+    padding: 0.65rem 0.75rem;
+    /* más baja: deja ver al cliente encima */
+    max-height: min(42vh, 280px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
+  .customer-panel #customer-desc {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    margin-bottom: 0.35rem;
+  }
+
+  .customer-panel .order {
+    font-size: 0.72rem;
+    margin-bottom: 0.5rem;
+    padding-left: 0.5rem;
+  }
+
+  .customer-panel .actions {
+    gap: 0.25rem;
+  }
+
+  .customer-panel .actions .btn {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.68rem;
+  }
+
+  /* Texto arriba; Contestar / Colgar abajo a la izquierda */
   .phone-ui {
     position: relative;
     left: auto;
     bottom: auto;
     transform: none;
-    align-self: center;
+    align-self: stretch;
     margin: 0 0.55rem 0.45rem;
     max-width: calc(100% - 1.1rem);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .phone-ui > p {
+    flex: 0 0 100%;
+    width: 100%;
+    margin: 0;
+    font-size: 0.78rem;
+  }
+
+  .phone-ui .btn {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.68rem;
   }
 
   .look-btn {

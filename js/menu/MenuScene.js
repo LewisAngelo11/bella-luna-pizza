@@ -35,11 +35,11 @@ export class MenuScene {
     this.scene.background = new THREE.Color(0x121c28);
     this.scene.fog = new THREE.FogExp2(0x0c1420, 0.008);
 
-    this.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 80);
-    this._camBase = new THREE.Vector3(-9.2, 2.55, 11.2);
-    this.camera.position.copy(this._camBase);
-    this._look = new THREE.Vector3(5.8, 1.85, -0.4);
-    this.camera.lookAt(this._look);
+    this.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 120);
+    // Desktop: UI izq. / local a la derecha. Móvil: se recentra en _syncMenuFraming()
+    this._camBase = new THREE.Vector3(-6.2, 2.55, 11.4);
+    this._lookBase = new THREE.Vector3(6, 1.85, -0.5);
+    this._look = this._lookBase.clone();
 
     this.root = new THREE.Group();
     this.scene.add(this.root);
@@ -48,6 +48,7 @@ export class MenuScene {
     this._buildLights();
     this._buildGround();
     this._buildSky();
+    this._buildMountains();
     this._buildBuilding();
     this._buildNeon();
     this._buildAwning();
@@ -56,9 +57,10 @@ export class MenuScene {
     this._buildPines();
     this._buildFogWisps();
 
-    // Edificio anclado a la derecha; UI ocupa el negativo a la izquierda
-    this.root.position.set(5.8, 0, -1.8);
-    this.root.rotation.y = -0.48;
+    this.root.rotation.y = -0.5;
+    this._syncMenuFraming();
+    this.camera.position.copy(this._camBase);
+    this.camera.lookAt(this._look);
 
     this._onMove = (e) => {
       this.pointerX = e.clientX / window.innerWidth;
@@ -449,7 +451,14 @@ export class MenuScene {
       crescent: new THREE.MeshBasicMaterial({
         map: this.tex.crescent, transparent: true, depthWrite: false,
       }),
-      moon: new THREE.MeshBasicMaterial({ map: this.tex.moon, transparent: true, depthWrite: false }),
+      moon: new THREE.MeshBasicMaterial({
+        map: this.tex.moon,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      }),
       foliage: new THREE.MeshStandardMaterial({ color: 0x0e1810, roughness: 1 }),
       car: new THREE.MeshStandardMaterial({ color: 0x5a1010, roughness: 0.45, metalness: 0.3 }),
       wet: new THREE.MeshStandardMaterial({
@@ -574,9 +583,9 @@ export class MenuScene {
   }
 
   _buildSky() {
-    // Luna blanca fija en esquina superior derecha (espacio de cámara)
+    // Luna en espacio de cámara, capa más baja (pinos/montañas la tapan)
     const moon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.mats.moon);
-    moon.renderOrder = 2;
+    moon.renderOrder = -1000;
     this.camera.add(moon);
     this.scene.add(this.camera);
     this.moonMesh = moon;
@@ -592,6 +601,95 @@ export class MenuScene {
       );
       c.rotation.y = Math.random() * 0.5;
     }
+  }
+
+  /**
+   * Cordillera de fondo a la DERECHA de la vista del jugador.
+   * Posición = cámara + forward*dist + right*offset (no ejes mundo).
+   * Capas con distancia distinta → sin z-fight / parpadeo.
+   */
+  _buildMountains() {
+    const g = new THREE.Group();
+    this.scene.add(g);
+    this.mountains = g;
+
+    const makeRidge = (color, points) => {
+      const shape = new THREE.Shape();
+      shape.moveTo(points[0][0], 0);
+      for (let i = 0; i < points.length; i++) {
+        shape.lineTo(points[i][0], points[i][1]);
+      }
+      shape.lineTo(points[points.length - 1][0], 0);
+      shape.closePath();
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: 1.4,
+        bevelEnabled: false,
+      });
+      geo.translate(0, 0, -0.7);
+      return new THREE.Mesh(
+        geo,
+        new THREE.MeshBasicMaterial({
+          color,
+          fog: true,
+          toneMapped: false,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        }),
+      );
+    };
+
+    // Ejes de la vista del menú
+    const forward = this._lookBase.clone().sub(this._camBase).setY(0).normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    const cam = this._camBase;
+
+    // dist = atrás; rightOff = derecha en pantalla; capas separadas anti-parpadeo
+    const layers = [
+      {
+        color: 0x152030,
+        dist: 46,
+        rightOff: 34,
+        hScale: 1.2,
+        points: [
+          [0, 2], [6, 9], [12, 5], [18, 14], [26, 7], [34, 16], [42, 8], [50, 12], [58, 3],
+        ],
+      },
+      {
+        color: 0x1c2a3c,
+        dist: 38,
+        rightOff: 32,
+        hScale: 1.0,
+        points: [
+          [0, 1.5], [7, 7], [14, 4], [22, 11], [30, 6], [38, 13], [46, 5], [54, 2],
+        ],
+      },
+      {
+        color: 0x243448,
+        dist: 30,
+        rightOff: 22,
+        hScale: 0.85,
+        points: [
+          [0, 1], [8, 5.5], [16, 3], [24, 9], [32, 4.5], [40, 7.5], [48, 2],
+        ],
+      },
+    ];
+
+    layers.forEach((L, i) => {
+      const pos = cam.clone()
+        .addScaledVector(forward, L.dist)
+        .addScaledVector(right, L.rightOff);
+      pos.y = 0;
+
+      const mesh = makeRidge(L.color, L.points);
+      mesh.position.copy(pos);
+      mesh.scale.set(1, L.hScale, 1);
+      mesh.lookAt(cam.x, 4, cam.z);
+      mesh.rotateY(Math.PI);
+      mesh.material.polygonOffsetFactor = 2 + i * 2;
+      mesh.material.polygonOffsetUnits = 2 + i * 2;
+      g.add(mesh);
+    });
   }
 
   _buildBuilding() {
@@ -862,24 +960,48 @@ export class MenuScene {
     this.root.add(this.fogPts);
   }
 
+  _isMobileMenu() {
+    return (
+      window.matchMedia("(max-width: 720px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches
+    );
+  }
+
+  /** Desktop: local a la derecha. Móvil: preview más al centro. */
+  _syncMenuFraming() {
+    if (this._isMobileMenu()) {
+      this._camBase.set(-9.2, 2.55, 11.2);
+      this._lookBase.set(4.4, 1.85, -0.4);
+      this.root.position.set(4.2, 0, -1.8);
+    } else {
+      this._camBase.set(-6.2, 2.55, 11.4);
+      this._lookBase.set(6, 1.85, -0.5);
+      this.root.position.set(10.2, 0, -1.8);
+    }
+  }
+
   setActive(on) {
     this.active = !!on;
     this.canvas.style.opacity = on ? "1" : "0";
     this.canvas.style.pointerEvents = "none";
     if (on) {
-      this.resize();
+      // Primero FOV/cámara base, luego resize + luna (si no, la luna queda anclada al FOV del approach)
+      this._syncMenuFraming();
       if (!this.entering) this.resetCamera();
+      this.resize();
     }
   }
 
   resetCamera() {
     this.entering = false;
     this._enterAnim = null;
+    this._syncMenuFraming();
     this.camera.fov = this._camFovBase;
     this.camera.updateProjectionMatrix();
     this.camera.position.copy(this._camBase);
-    this._look.set(5.8, 1.85, -0.4);
+    this._look.copy(this._lookBase);
     this.camera.lookAt(this._look);
+    this._placeMoon();
   }
 
   /**
@@ -962,11 +1084,12 @@ export class MenuScene {
 
   _placeMoon() {
     if (!this.moonMesh) return;
-    const z = 14;
+    // Más lejos que pinos/montañas → queda detrás en el depth buffer
+    const z = 55;
     const halfH = Math.tan((this.camera.fov * Math.PI) / 360) * z;
     const halfW = halfH * this.camera.aspect;
-    const size = Math.min(halfW, halfH) * 0.78;
-    this.moonMesh.position.set(halfW * 0.9, halfH * 0.86, -z);
+    const size = Math.min(halfW, halfH) * 0.72;
+    this.moonMesh.position.set(halfW * 0.88, halfH * 0.82, -z);
     this.moonMesh.userData.baseScale = size;
     this.moonMesh.scale.set(size, size, 1);
   }
@@ -974,6 +1097,7 @@ export class MenuScene {
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    this._syncMenuFraming();
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
@@ -1008,8 +1132,8 @@ export class MenuScene {
       const k = Math.min(1, dt * 2.5);
       this.camera.position.x += (tx - this.camera.position.x) * k;
       this.camera.position.y += (ty - this.camera.position.y) * k;
-      this._look.x = 5.8 + (this.pointerX - 0.5) * 0.45;
-      this._look.y = 1.85 + (0.5 - this.pointerY) * 0.28;
+      this._look.x = this._lookBase.x + (this.pointerX - 0.5) * 0.45;
+      this._look.y = this._lookBase.y + (0.5 - this.pointerY) * 0.28;
       this.camera.lookAt(this._look);
     }
 

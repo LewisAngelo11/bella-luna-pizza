@@ -1123,9 +1123,23 @@ export class Game {
   }
 
   die(kind, customMsg, customDetail) {
+    // Abrir ojos antes de cortar el turno (setEyesClosed no actúa si !playing)
+    this.setEyesClosed(false);
     this.playing = false;
     this.paused = false;
-    document.getElementById("screen-pause").classList.remove("active");
+    this.renderer?.clearLookHold?.();
+
+    // Solo jumpscare a pantalla: ocultar HUD y overlays de UI
+    document.getElementById("screen-hud")?.classList.remove("active");
+    document.getElementById("screen-pause")?.classList.remove("active");
+    document.getElementById("screen-rules")?.classList.remove("active");
+    document.getElementById("rules-panel")?.classList.remove("open");
+    document.getElementById("event-banner")?.classList.add("hidden");
+    document.getElementById("info-banner")?.classList.add("hidden");
+    document.getElementById("customer-panel")?.classList.add("hidden");
+    document.getElementById("phone-ui")?.classList.add("hidden");
+    if (this.canvas) this.canvas.style.opacity = "1";
+
     this.audio.jumpscare();
     this.renderer.triggerJumpscare();
     this.flashBlood();

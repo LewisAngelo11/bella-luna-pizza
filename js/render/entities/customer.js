@@ -1,5 +1,13 @@
 import * as THREE from "three";
 
+/** Colores de camisa (solo torso / hombros). */
+const SHIRT_COLORS = [
+  0x1a1a1a, // negra
+  0xf2efe8, // blanca
+  0x2f4f8a, // azul
+  0x6b4423, // café
+];
+
 export function setupCustomer(r) {
   r.customerGroup = new THREE.Group();
   r.customerGroup.visible = false;
@@ -7,6 +15,8 @@ export function setupCustomer(r) {
 
   const cloth = new THREE.MeshStandardMaterial({ color: 0x5a4038, roughness: 0.85 });
   const clothDark = new THREE.MeshStandardMaterial({ color: 0x3a2820, roughness: 0.88 });
+  const shirt = new THREE.MeshStandardMaterial({ color: SHIRT_COLORS[0], roughness: 0.82 });
+  r.customerShirtMat = shirt;
   const skin = new THREE.MeshStandardMaterial({ color: 0xd4a888, roughness: 0.55 });
   const hair = new THREE.MeshStandardMaterial({ color: 0x2a1a12, roughness: 0.9 });
 
@@ -17,16 +27,14 @@ export function setupCustomer(r) {
   r.box(0.18, 0.08, 0.28, clothDark, -0.12, 0.05, 0.06, r.customerGroup, { cast: false });
   r.box(0.18, 0.08, 0.28, clothDark, 0.12, 0.05, 0.06, r.customerGroup, { cast: false });
 
-  // Cadera / cintura (más estrecha)
+  // Cadera / cintura (más estrecha) — pantalón, no camisa
   r.box(0.42, 0.22, 0.28, cloth, 0, 0.68, 0.01, r.customerGroup);
 
-  // Torso (pecho un poco más ancho que la cintura, sin “capa” cuadrada)
-  r.customerBody = r.box(0.48, 0.55, 0.3, cloth, 0, 1.05, 0, r.customerGroup);
-
-  // Hombros suaves
-  r.box(0.56, 0.16, 0.26, cloth, 0, 1.36, 0, r.customerGroup);
-  r.box(0.14, 0.14, 0.14, cloth, -0.32, 1.34, 0.02, r.customerGroup, { cast: false });
-  r.box(0.14, 0.14, 0.14, cloth, 0.32, 1.34, 0.02, r.customerGroup, { cast: false });
+  // Torso + hombros (camisa; color aleatorio por cliente)
+  r.customerBody = r.box(0.48, 0.55, 0.3, shirt, 0, 1.05, 0, r.customerGroup);
+  r.box(0.56, 0.16, 0.26, shirt, 0, 1.36, 0, r.customerGroup);
+  r.box(0.14, 0.14, 0.14, shirt, -0.32, 1.34, 0.02, r.customerGroup, { cast: false });
+  r.box(0.14, 0.14, 0.14, shirt, 0.32, 1.34, 0.02, r.customerGroup, { cast: false });
 
   // Cuello
   r.box(0.12, 0.1, 0.12, skin, 0, 1.48, 0.02, r.customerGroup, { cast: false });
@@ -49,7 +57,14 @@ export function setupCustomer(r) {
   const hairMesh = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), hair);
   hairMesh.scale.set(1.08, 0.72, 1.05);
   hairMesh.position.set(0, 1.82, -0.02);
+  hairMesh.castShadow = true;
   r.customerGroup.add(hairMesh);
+
+  // Relleno suave en la cara: quita la sombra bajo la barbilla en clientes sin sombra
+  r.customerFaceLight = new THREE.PointLight(0xfff2e0, 0, 1.6, 2);
+  r.customerFaceLight.position.set(0, 1.78, 0.42);
+  r.customerFaceLight.castShadow = false;
+  r.customerGroup.add(r.customerFaceLight);
 
   // Ojos
   r.eyeL = new THREE.Mesh(
@@ -98,7 +113,22 @@ export function setupCustomer(r) {
     );
   }
   r.customerGroup.add(r.teethGroup);
+
+  // Guardar qué piezas proyectan sombra (para restaurar en clientes normales)
+  r.customerGroup.traverse((obj) => {
+    if (obj.isMesh && obj !== r.customerShadow) {
+      obj.userData.castShadowDefault = !!obj.castShadow;
+    }
+  });
+
   r.root.add(r.customerGroup);
+}
+
+function setCustomerBodyShadows(r, enabled) {
+  r.customerGroup?.traverse((obj) => {
+    if (!obj.isMesh || obj === r.customerShadow) return;
+    obj.castShadow = enabled ? !!obj.userData.castShadowDefault : false;
+  });
 }
 
 export function applyCustomer(r, c) {
@@ -106,12 +136,21 @@ export function applyCustomer(r, c) {
   if (!c) {
     r.customerGroup.visible = false;
     if (r.customerLight) r.customerLight.intensity = 0;
+    if (r.customerFaceLight) r.customerFaceLight.intensity = 0;
     return;
   }
   r.customerGroup.visible = true;
   if (r.customerLight) r.customerLight.intensity = 3.2;
+  if (r.customerShirtMat) {
+    const hex = SHIRT_COLORS[(Math.random() * SHIRT_COLORS.length) | 0];
+    r.customerShirtMat.color.setHex(hex);
+  }
   const traits = c.traits || {};
-  r.customerShadow.visible = traits.shadow !== false;
+  const hasShadow = traits.shadow !== false;
+  r.customerShadow.visible = hasShadow;
+  // Sin sombra: ni blob en el suelo ni proyección del cuerpo; luz suave en la cara
+  setCustomerBodyShadows(r, hasShadow);
+  if (r.customerFaceLight) r.customerFaceLight.intensity = hasShadow ? 0 : 1.15;
   if (traits.redEyes) {
     const m = new THREE.MeshStandardMaterial({
       color: 0xff1111, emissive: 0xff0000, emissiveIntensity: 1.5,
