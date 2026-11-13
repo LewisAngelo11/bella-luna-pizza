@@ -10,20 +10,11 @@
   --ui: rgba(12, 8, 6, 0.82);
   --ok: #3d8b5f;
   --danger: #c0392b;
-  /* PWA / notch: UI respeta el área segura; el canvas sigue a pantalla completa */
+  /* PWA / notch: UI debajo; el canvas sigue a pantalla completa */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
-}
-
-@supports (padding: max(0px)) {
-  :root {
-    --safe-top: max(env(safe-area-inset-top, 0px), constant(safe-area-inset-top));
-    --safe-right: max(env(safe-area-inset-right, 0px), constant(safe-area-inset-right));
-    --safe-bottom: max(env(safe-area-inset-bottom, 0px), constant(safe-area-inset-bottom));
-    --safe-left: max(env(safe-area-inset-left, 0px), constant(safe-area-inset-left));
-  }
 }
 
 * {
@@ -241,75 +232,6 @@ body:has(#screen-menu.entering) #vignette {
   .menu-content {
     padding: calc(1.5rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.5rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
     max-width: 100%;
-  }
-}
-
-/* Móvil acostado: layout tipo desktop (UI izq. compacta + escena der.) */
-@media (max-width: 960px) and (orientation: landscape) {
-  #screen-menu {
-    background: linear-gradient(
-      90deg,
-      rgba(6, 4, 8, 0.82) 0%,
-      rgba(6, 4, 8, 0.55) 36%,
-      rgba(6, 4, 8, 0.12) 56%,
-      transparent 70%
-    );
-    align-items: stretch;
-  }
-
-  .menu-content {
-    align-self: center;
-    max-width: min(300px, 40vw);
-    padding:
-      calc(0.55rem + var(--safe-top))
-      calc(0.75rem + var(--safe-right))
-      calc(0.55rem + var(--safe-bottom))
-      max(3vw, calc(0.75rem + var(--safe-left)));
-  }
-
-  .eyebrow {
-    font-size: 0.58rem;
-    letter-spacing: 0.14em;
-    margin-bottom: 0.35rem;
-  }
-
-  .menu-content h1 {
-    font-size: clamp(1.15rem, 5.2vh, 1.85rem);
-    margin-bottom: 0.4rem;
-    text-shadow: 0 0 22px rgba(232, 93, 4, 0.4), 0 2px 0 #3a1008;
-  }
-
-  .tagline {
-    font-size: 0.72rem;
-    line-height: 1.35;
-    margin-bottom: 0.65rem;
-  }
-
-  .menu-actions {
-    gap: 0.35rem;
-  }
-
-  .menu-actions .btn {
-    min-width: 6.2rem;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.72rem;
-    margin: 0;
-  }
-
-  .hint {
-    margin-top: 0.55rem;
-    font-size: 0.58rem;
-    line-height: 1.35;
-    max-width: 28rem;
-  }
-
-  .menu-version {
-    margin-top: 0.45rem;
-    font-size: 0.58rem;
-  }
-
-  body:has(#screen-menu.active) #vignette {
-    background: radial-gradient(ellipse at 38% 45%, transparent 42%, rgba(0, 0, 0, 0.45) 100%);
   }
 }
 
@@ -573,15 +495,13 @@ body:has(#screen-menu.entering) #vignette {
   margin-bottom: 0.8rem;
 }
 
-/* Hoja de reglamento: tamaño estándar; scroll de toda la hoja (sin pie fijo encima) */
+/* Hoja de reglamento: tamaño fijo (página grande) + textura de libreta vieja */
 .rules-paper {
-  display: block;
-  /* Alto estándar; si el viewport es más bajo, scrollea el contenido completo */
-  height: 52rem;
+  display: flex;
+  flex-direction: column;
+  height: min(52rem, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 1.5rem));
   max-height: min(88vh, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 1.5rem));
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   padding: 1.75rem 2.9rem 1.8rem;
   /* Libreta envejecida: líneas, margen rojo, manchas y arrugas */
   background-color: #e6d5b0;
@@ -621,23 +541,24 @@ body:has(#screen-menu.entering) #vignette {
 }
 
 .rules-paper-top {
-  display: block;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
 .rules-paper #rules-list {
-  /* Reserva altura de la página más larga (8 reglas) → misma hoja en pág. 2 */
+  /* Reserva altura de la página más larga (8 reglas) */
+  flex: 1 1 auto;
   min-height: 22.5rem;
   margin-bottom: 0.4rem;
 }
 
 .rules-paper-bottom {
-  display: block;
-  margin-top: 0.5rem;
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
   padding-top: 0.35rem;
-  /* En el flujo del documento, debajo de las reglas (no sticky/overlap) */
-  position: relative;
-  z-index: 1;
 }
 
 .rules-pager {
@@ -779,7 +700,7 @@ body:has(#screen-menu.entering) #vignette {
   gap: 0.65rem;
   align-items: stretch;
   justify-content: center;
-  padding: 0.55rem 0 max(0.75rem, var(--safe-bottom));
+  padding: 0.55rem 0.75rem max(0.75rem, var(--safe-bottom));
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), transparent);
   box-sizing: border-box;
 }
@@ -1220,19 +1141,12 @@ body:has(#screen-menu.entering) #vignette {
     line-height: 1.25;
   }
 
-  /* Dock respeta notch izq/der (PWA landscape) como el HUD superior */
-  .hud-dock {
-    padding-left: max(0.75rem, var(--safe-left));
-    padding-right: max(0.75rem, var(--safe-right));
-    box-sizing: border-box;
-  }
-
   .customer-panel {
     position: relative;
     right: auto;
     bottom: auto;
     width: auto;
-    margin: 0 0 0.35rem;
+    margin: 0 0.55rem 0.35rem;
     padding: 0.65rem 0.75rem;
     /* más baja: deja ver al cliente encima */
     max-height: min(42vh, 280px);
@@ -1268,8 +1182,8 @@ body:has(#screen-menu.entering) #vignette {
     bottom: auto;
     transform: none;
     align-self: stretch;
-    margin: 0 0 0.45rem;
-    max-width: 100%;
+    margin: 0 0.55rem 0.45rem;
+    max-width: calc(100% - 1.1rem);
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
