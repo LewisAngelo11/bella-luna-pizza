@@ -37,11 +37,6 @@ export function buildTable(r, { id, x, z }) {
   g.add(flame);
   candle.userData.flame = flame;
 
-  const label = r.makeLabel(
-    id === 6 ? "MESA 6" : `Mesa ${id}`,
-    0, 0.12, 0.85, 0.13, id === 6 ? 0xc08070 : 0xaa8866,
-  );
-  g.add(label);
   r.root.add(g);
 
   const entry = { group: g, top, ghost: null, flame };

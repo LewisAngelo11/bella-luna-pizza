@@ -111,8 +111,8 @@ export function updateFrame(r, dt, state) {
     }
 
     if (r.doorKnob) {
-      r.doorKnob.material.color.setHex(r.doorLocked ? 0xf4d35e : 0xc83c28);
-      r.doorKnob.material.emissive.setHex(r.doorLocked ? 0xaa8800 : 0x661100);
+      r.doorKnob.material.color.setHex(r.doorLocked ? 0x33ff77 : 0xc83c28);
+      r.doorKnob.material.emissive.setHex(r.doorLocked ? 0x22aa44 : 0x661100);
     }
     if (r.doorBolt) r.doorBolt.visible = r.doorLocked;
 

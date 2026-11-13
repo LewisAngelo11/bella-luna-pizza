@@ -3,6 +3,7 @@ import { buildTable } from "./table.js";
 const LAYOUT = [
   { id: 1, x: -1.8, z: 8.5 },
   { id: 2, x: 0.4, z: 9.3 },
+  { id: 4, x: 2.6, z: 6.8 },
   { id: 6, x: -2.7, z: 6.1 },
 ];
 

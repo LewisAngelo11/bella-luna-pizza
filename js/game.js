@@ -43,6 +43,8 @@ export class Game {
     this.eyesClosed = false;
     this.eyesClosedNeeded = false;
     this.currentCustomer = null;
+    this.customerAttendTimer = 0;
+    this.customerAttendTicks = 0;
     this.customerQueueTimer = 8;
     this.phoneActive = false;
     this.phoneRings = 0;
@@ -88,10 +90,29 @@ export class Game {
   }
 
   populateRules() {
-    const list = document.getElementById("rules-list");
+    this.rulesPage = 0;
     const mini = document.getElementById("rules-mini");
-    list.innerHTML = RULES.map((r) => `<li>${r.text}</li>`).join("");
     mini.innerHTML = RULES.map((r) => `<li>${r.text}</li>`).join("");
+    this.renderRulesPage();
+  }
+
+  renderRulesPage() {
+    const perPage = 8;
+    const page = Math.max(0, Math.min(this.rulesPage ?? 0, Math.ceil(RULES.length / perPage) - 1));
+    this.rulesPage = page;
+    const start = page * perPage;
+    const slice = RULES.slice(start, start + perPage);
+    const list = document.getElementById("rules-list");
+    list.start = start + 1;
+    list.innerHTML = slice.map((r) => `<li>${r.text}</li>`).join("");
+
+    const totalPages = Math.ceil(RULES.length / perPage);
+    const label = document.getElementById("rules-page-label");
+    const prev = document.getElementById("btn-rules-prev");
+    const next = document.getElementById("btn-rules-next");
+    if (label) label.textContent = `Página ${page + 1} de ${totalPages}`;
+    if (prev) prev.disabled = page <= 0;
+    if (next) next.disabled = page >= totalPages - 1;
   }
 
   bindUI() {
@@ -103,8 +124,18 @@ export class Game {
         this.showScreen("menu");
         return;
       }
+      this.rulesPage = 0;
+      this.renderRulesPage();
       this.updateRulesButtons();
       this.showScreen("rules");
+    };
+    document.getElementById("btn-rules-prev").onclick = () => {
+      this.rulesPage = (this.rulesPage ?? 0) - 1;
+      this.renderRulesPage();
+    };
+    document.getElementById("btn-rules-next").onclick = () => {
+      this.rulesPage = (this.rulesPage ?? 0) + 1;
+      this.renderRulesPage();
     };
     document.getElementById("btn-close-rules").onclick = () => {
       if (this.paused) {
@@ -233,6 +264,8 @@ export class Game {
   openRulesFromPause() {
     if (!this.paused) return;
     this.audio?.click?.();
+    this.rulesPage = 0;
+    this.renderRulesPage();
     this.updateRulesButtons();
     document.getElementById("screen-pause").classList.remove("active");
     document.getElementById("screen-hud").classList.remove("active");
@@ -344,7 +377,7 @@ export class Game {
       return;
     }
     if (target === "table6") {
-      this.showInfo("Estás mirando la Mesa 6…");
+      this.showInfo("Estás mirando la mesa junto al congelador…");
     }
   }
 
@@ -513,6 +546,8 @@ export class Game {
     this.eyesClosed = false;
     this.eyesClosedNeeded = false;
     this.currentCustomer = null;
+    this.customerAttendTimer = 0;
+    this.customerAttendTicks = 0;
     this.customerQueueTimer = 6;
     this.phoneActive = false;
     this.phoneRings = 0;
@@ -588,6 +623,7 @@ export class Game {
         this.freezerAutoTimer = 0;
         this.freezerAutoCloseIn = -1;
         this.freezerAutoNextIn = this.nextFreezerAutoDelay();
+        this.freezerKnockTimer = Math.max(this.freezerKnockTimer, 5);
         this.clearWarningEvent("freezer_auto");
         this.showInfo("Cierras el congelador a tiempo. El frío se queda dentro.");
       } else {
@@ -860,9 +896,16 @@ export class Game {
     }
 
     this.currentCustomer = customer;
+    this.customerAttendTimer = 0;
+    this.customerAttendTicks = 0;
     this.renderer.setCustomer(customer);
     this.showCustomerUI(customer);
     this.audio.customerEnter();
+    // Anomalías inquietantes: −5% cordura al aparecer
+    if (this.isUnnervingCustomer(customer)) {
+      this.addFear(5);
+      if (!this.playing) return;
+    }
     this.showInfo(
       witching
         ? "Algo entra… no parece un cliente cualquiera."
@@ -897,6 +940,7 @@ export class Game {
 
     const correct = c.correct;
     let ok = action === correct;
+    const wasQuick = this.customerAttendTicks === 0;
 
     // casos especiales: servir pizza a ojos rojos es malo, etc. ya cubierto por correct
 
@@ -904,12 +948,12 @@ export class Game {
       if (action === "refuse" || action === "serve_lookaway" || action === "serve_garlic") {
         this.refusedCount++;
         this.showInfo(c.anomaly ? "Hiciste lo correcto. Se va… despacio." : "Pedido atendido.");
-        this.addFear(-3);
       } else {
         this.servedCount++;
         this.showInfo("Pedido servido. El horno crepita.");
-        this.addFear(-2);
       }
+      // Atender en menos de 5 s → +5% cordura
+      if (wasQuick) this.addFear(-5);
       this.clearCustomer();
     } else {
       if (c.anomaly && c.wrongDeath) {
@@ -919,13 +963,14 @@ export class Game {
         this.addFear(18);
         this.flashBlood();
         this.clearCustomer();
-        if (this.fear >= 100) this.die("fear");
       }
     }
   }
 
   clearCustomer() {
     this.currentCustomer = null;
+    this.customerAttendTimer = 0;
+    this.customerAttendTicks = 0;
     this.renderer.setCustomer(null);
     this.hideCustomerPanel();
     this.customerQueueTimer = this.nextCustomerDelay();
@@ -978,6 +1023,20 @@ export class Game {
   addFear(n) {
     this.fear = Math.max(0, Math.min(100, this.fear + n));
     this.updateFearUI();
+    // Cordura a 0% → jumpscare
+    if (n > 0 && this.playing && !this.paused && this.fear >= 100) {
+      this.die("fear");
+    }
+  }
+
+  /** Cordura restante 0–100 (UI). */
+  getCordura() {
+    return 100 - this.fear;
+  }
+
+  isUnnervingCustomer(c) {
+    const t = c?.traits || {};
+    return t.shadow === false || t.redEyes || t.tooManyTeeth || t.claimsManager;
   }
 
   updateFearUI() {
@@ -1011,7 +1070,10 @@ export class Game {
 
   /** Multiplicador de cadencia de eventos raros (solo afecta countdowns) */
   eventPressure() {
-    return this.isWitchingHour() ? 2.6 : 1;
+    let p = this.isWitchingHour() ? 2.6 : 1;
+    // ≤50% cordura → eventos un 5% más frecuentes
+    if (this.fear >= 50) p *= 1.05;
+    return p;
   }
 
   /** Intervalos más cortos en la hora bruja */
@@ -1128,7 +1190,7 @@ export class Game {
         return;
       }
       if (this.table6Timer > 1.5) {
-        this.showWarning("Algo raro se ve en la mesa 6…", {
+        this.showWarning("Algo raro se ve en la mesa junto al congelador…", {
           zone: "front",
           eventId: "table6",
           isActive: () => this.lookingTable6 && this.table6Timer > 1.5,
@@ -1159,6 +1221,8 @@ export class Game {
             this.audio.noiseBurst?.(0.25, 0.07, {
               freq: 220, filter: "lowpass", color: "brown",
             });
+            this.addFear(10); // evento auto → −10% cordura
+            if (!this.playing) return;
             this.showWarning("La puerta trasera está abierta", {
               zone: "kitchen",
               eventId: "door_open",
@@ -1250,6 +1314,8 @@ export class Game {
         this.ovenOffDeadline = 5;
         this.renderer.setOvenOn(false);
         this.audio.noiseBurst?.(0.35, 0.1, { freq: 180, filter: "lowpass", color: "brown" });
+        this.addFear(10); // evento auto → −10% cordura
+        if (!this.playing) return;
         this.showWarning("¡El horno se apagó!", {
           zone: "kitchen",
           eventId: "oven_off",
@@ -1264,7 +1330,7 @@ export class Game {
       }
     }
 
-    // —— Congelador: se abre solo (pausado 22:00–23:00) ——
+    // —— Congelador: auto-apertura y golpes NUNCA a la vez (mín. 5 s entre ellos) ——
     if (!calm && !this.freezerAutoPhase && !this.freezerKnock && !this.freezerOpen) {
       this.freezerAutoNextIn -= dt * pressure;
       if (this.freezerAutoNextIn <= 0) {
@@ -1273,7 +1339,11 @@ export class Game {
         this.freezerAutoPhase = "grace";
         this.freezerAutoTimer = 5;
         this.freezerAutoCloseIn = Math.random() < 0.55 ? 1.2 + Math.random() * 3.5 : -1;
+        // Empujar golpes para que no coincidan
+        this.freezerKnockTimer = Math.max(this.freezerKnockTimer, 5 + Math.random() * 3);
         this.audio.noiseBurst?.(0.2, 0.08, { freq: 320, filter: "bandpass", Q: 2, color: "pink" });
+        this.addFear(10); // evento auto → −10% cordura
+        if (!this.playing) return;
         this.showWarning(
           this.freezerAutoCloseIn > 0
             ? "El congelador se abrió solo…"
@@ -1296,6 +1366,7 @@ export class Game {
           this.freezerAutoTimer = 0;
           this.freezerAutoCloseIn = -1;
           this.freezerAutoNextIn = this.nextFreezerAutoDelay();
+          this.freezerKnockTimer = Math.max(this.freezerKnockTimer, 5);
           this.clearWarningEvent("freezer_auto");
           this.showInfo("El congelador se cerró solo. Por ahora.");
         }
@@ -1317,16 +1388,13 @@ export class Game {
       }
     }
 
-    if (!calm && !this.freezerKnock) {
+    // Golpes: no cuentan si hay auto-apertura / puerta abierta por evento
+    if (!calm && !this.freezerKnock && !this.freezerAutoPhase && !this.freezerOpen) {
       this.freezerKnockTimer -= dt * pressure;
       if (this.freezerKnockTimer <= 0) {
-        if (this.freezerOpen) {
-          // Lo dejaste abierto: lo que golpeaba ya no necesita permiso
-          this.die("freezer_opened");
-          return;
-        }
         this.freezerKnock = true;
         this._knockLeft = 8 + Math.random() * 6;
+        this.freezerAutoNextIn = Math.max(this.freezerAutoNextIn, 5 + Math.random() * 3);
         this.showWarning("…golpes sordos desde el congelador.", {
           zone: "front",
           eventId: "freezer_knock",
@@ -1342,9 +1410,13 @@ export class Game {
         this.freezerKnockTimer = this.isWitchingHour()
           ? 12 + Math.random() * 18
           : 40 + Math.random() * 50;
+        this.freezerAutoNextIn = Math.max(this.freezerAutoNextIn, 5);
         this.clearWarningEvent("freezer_knock");
         this.showInfo("Los golpes cesan. No abras esa puerta.");
       }
+    } else if (this.freezerAutoPhase || this.freezerOpen) {
+      // Mientras el otro evento está activo, no dejar el timer de golpes en 0
+      if (this.freezerKnockTimer < 5) this.freezerKnockTimer = 5;
     }
 
     // Flicker de luces (pausado 22:00–23:00; más frecuente 03:00–04:00)
@@ -1352,6 +1424,8 @@ export class Game {
       this.flickerTimer -= dt * pressure;
       if (this.flickerTimer <= 0 && this.flickerIntensity === 0) {
         this.flickerIntensity = 1;
+        this.addFear(10); // luces → −10% cordura
+        if (!this.playing) return;
         this.eyesClosedNeeded = true;
         this._flickerLeft = 3.5 + Math.random() * 1.5;
         this.showWarning("Las luces parpadean. Cierra los ojos.", {
@@ -1402,10 +1476,20 @@ export class Game {
       }
     }
 
-    // Clientes
-    if (!this.currentCustomer && !this.phoneActive) {
+    // Clientes: cada 5 s de espera → −10% cordura; atender <5 s → +5%
+    if (this.currentCustomer) {
+      this.customerAttendTimer += dt;
+      while (this.customerAttendTimer >= 5) {
+        this.customerAttendTimer -= 5;
+        this.customerAttendTicks += 1;
+        this.addFear(10);
+        if (!this.playing) return;
+        this.showInfo("La espera te desgasta… (−10% cordura)", 2.2);
+      }
+    } else if (!this.phoneActive) {
       this.customerQueueTimer -= dt;
       if (this.customerQueueTimer <= 0) this.spawnCustomer();
+      if (!this.playing) return;
     }
 
     // ambient

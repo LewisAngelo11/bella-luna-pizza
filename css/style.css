@@ -492,7 +492,41 @@ body:has(#screen-menu.entering) #vignette {
 
 .paper ol {
   padding-left: 1.2rem;
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.rules-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.rules-pager #rules-page-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+  color: #6a5340;
+  letter-spacing: 0.04em;
+}
+
+.rules-pager .btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #1a120c;
+  padding: 0.35rem 0.25rem;
+}
+
+.rules-pager .btn:hover:not(:disabled) {
+  color: #5a4a3a;
+  background: transparent;
+  border: none;
+}
+
+.rules-pager .btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .paper li {

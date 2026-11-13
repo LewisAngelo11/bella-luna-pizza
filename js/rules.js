@@ -15,7 +15,7 @@ export const RULES = [
   },
   {
     id: "table6",
-    text: "No mires la Mesa 6 más de tres segundos seguidos.",
+    text: "No mires la mesa que está al lado del congelador más de tres segundos seguidos.",
   },
   {
     id: "phone",
@@ -158,9 +158,9 @@ export const DEATHS = {
     detail: "Regla rota: el congelador permanece cerrado.",
   },
   table6: {
-    title: "Mesa 6",
+    title: "Mesa del congelador",
     message: "Miraste demasiado. La silla vacía ya no está vacía. Nunca lo estuvo.",
-    detail: "Regla rota: no mires la Mesa 6 más de tres segundos.",
+    detail: "Regla rota: no mires la mesa junto al congelador más de tres segundos.",
   },
   phone_wrong: {
     title: "Línea equivocada",

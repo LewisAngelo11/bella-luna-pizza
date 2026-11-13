@@ -42,21 +42,29 @@ export function attachMeshHelpers(r) {
 
   r.makeLabel = (text, x, y, z, size = 0.2, color = 0x222222, parent = null) => {
     const c = document.createElement("canvas");
-    c.width = 256;
-    c.height = 64;
     const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, 256, 64);
+    const fontSize = 42;
+    ctx.font = `bold ${fontSize}px Cinzel, serif`;
+    const metrics = ctx.measureText(text);
+    const padX = 28;
+    const padY = 16;
+    const textW = Math.ceil(metrics.width);
+    // Ancho dinámico para que “CONGELADOR” y labels largos no se recorten
+    c.width = Math.max(256, textW + padX * 2);
+    c.height = fontSize + padY * 2;
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.font = `bold ${fontSize}px Cinzel, serif`;
     ctx.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
-    ctx.font = "bold 42px Cinzel, serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, 128, 32);
+    ctx.fillText(text, c.width / 2, c.height / 2);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     const mat = new THREE.MeshBasicMaterial({
       map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false,
     });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size * 4.2, size), mat);
+    const aspect = c.width / c.height;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size * aspect, size), mat);
     mesh.position.set(x, y, z);
     mesh.castShadow = false;
     mesh.receiveShadow = false;
