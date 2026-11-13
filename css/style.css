@@ -10,6 +10,11 @@
   --ui: rgba(12, 8, 6, 0.82);
   --ok: #3d8b5f;
   --danger: #c0392b;
+  /* PWA / notch: UI debajo; el canvas sigue a pantalla completa */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -188,7 +193,7 @@ body:has(#screen-menu.entering) #vignette {
   align-self: center;
   text-align: left;
   max-width: min(440px, 92vw);
-  padding: 2rem 1.5rem 2rem 6vw;
+  padding: calc(2rem + var(--safe-top)) calc(1.5rem + var(--safe-right)) calc(2rem + var(--safe-bottom)) max(6vw, calc(1.25rem + var(--safe-left)));
   z-index: 2;
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
@@ -225,7 +230,7 @@ body:has(#screen-menu.entering) #vignette {
   }
 
   .menu-content {
-    padding: 1.5rem 1.25rem;
+    padding: calc(1.5rem + var(--safe-top)) calc(1.25rem + var(--safe-right)) calc(1.5rem + var(--safe-bottom)) calc(1.25rem + var(--safe-left));
     max-width: 100%;
   }
 }
@@ -331,6 +336,7 @@ body:has(#screen-menu.entering) #vignette {
   justify-content: center;
   background: rgba(0,0,0,0.78);
   z-index: 20;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
 .paper,
@@ -339,7 +345,7 @@ body:has(#screen-menu.entering) #vignette {
     linear-gradient(180deg, #f0e6d2, #d9c8a8);
   color: var(--ink);
   width: min(560px, 92vw);
-  max-height: 88vh;
+  max-height: min(88vh, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 1.5rem));
   overflow: auto;
   padding: 2rem 2.2rem;
   box-shadow: 0 20px 60px rgba(0,0,0,0.7), inset 0 0 80px rgba(120,80,40,0.15);
@@ -513,6 +519,7 @@ body:has(#screen-menu.entering) #vignette {
   justify-content: center;
   background: rgba(4, 2, 2, 0.82);
   z-index: 30;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
 .pause-card {
@@ -548,8 +555,8 @@ body:has(#screen-menu.entering) #vignette {
 .btn-pause {
   pointer-events: auto;
   position: absolute;
-  top: 1rem;
-  right: 1.15rem;
+  top: calc(1rem + var(--safe-top));
+  right: calc(1.15rem + var(--safe-right));
   z-index: 12;
   width: 42px;
   height: 42px;
@@ -593,7 +600,7 @@ body:has(#screen-menu.entering) #vignette {
   gap: 0.65rem;
   align-items: stretch;
   justify-content: center;
-  padding: 0.55rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  padding: 0.55rem 0.75rem max(0.75rem, var(--safe-bottom));
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), transparent);
   box-sizing: border-box;
 }
@@ -672,21 +679,22 @@ body:has(#screen-menu.entering) #vignette {
 }
 
 .look-left {
-  left: max(0.45rem, env(safe-area-inset-left));
+  left: max(0.45rem, var(--safe-left));
 }
 
 .look-right {
-  right: max(0.45rem, env(safe-area-inset-right));
+  right: max(0.45rem, var(--safe-right));
 }
 
 .hud-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  /* reserva espacio a la derecha para el botón de pausa */
-  padding: 1rem 4.25rem 1rem 1.25rem;
+  /* reserva espacio a la derecha para el botón de pausa + safe-area PWA */
+  padding: calc(1rem + var(--safe-top)) calc(4.25rem + var(--safe-right)) 1rem calc(1.25rem + var(--safe-left));
   gap: 1rem;
-  background: linear-gradient(180deg, rgba(0,0,0,0.65), transparent);
+  /* el degradado cubre el notch: sin “borde” raro arriba */
+  background: linear-gradient(180deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 42%, transparent 100%);
 }
 
 .clock-wrap, .fear-wrap, .shift-wrap {
@@ -742,8 +750,8 @@ body:has(#screen-menu.entering) #vignette {
 
 .rules-panel {
   position: absolute;
-  top: 5.5rem;
-  left: 1.25rem;
+  top: calc(5.5rem + var(--safe-top));
+  left: calc(1.25rem + var(--safe-left));
   width: min(300px, 80vw);
   background: rgba(232, 220, 200, 0.94);
   color: var(--ink);
@@ -808,8 +816,8 @@ body:has(#screen-menu.entering) #vignette {
 /* Avisos informativos: esquina superior derecha (no tapan el centro) */
 .info-banner {
   position: absolute;
-  top: 4.75rem;
-  right: 1.25rem;
+  top: calc(4.75rem + var(--safe-top));
+  right: calc(1.25rem + var(--safe-right));
   left: auto;
   transform: none;
   background: transparent;
@@ -953,6 +961,7 @@ body:has(#screen-menu.entering) #vignette {
   justify-content: center;
   background: rgba(0,0,0,0.82);
   z-index: 25;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
 .end-card {
@@ -1003,13 +1012,13 @@ body:has(#screen-menu.entering) #vignette {
   .hud-top {
     flex-wrap: wrap;
     /* más aire a la derecha para no pegar cordura/turno al botón de pausa */
-    padding: 0.75rem 5.25rem 0.75rem 0.75rem;
+    padding: calc(0.75rem + var(--safe-top)) calc(5.25rem + var(--safe-right)) 0.75rem calc(0.75rem + var(--safe-left));
     gap: 0.55rem 0.75rem;
   }
 
   .btn-pause {
-    top: 0.7rem;
-    right: max(0.55rem, env(safe-area-inset-right));
+    top: calc(0.7rem + var(--safe-top));
+    right: max(0.55rem, var(--safe-right));
   }
 
   .fear-wrap {
@@ -1063,7 +1072,7 @@ body:has(#screen-menu.entering) #vignette {
   .info-banner {
     max-width: min(220px, 48vw);
     font-size: 0.65rem;
-    top: 4.35rem;
-    right: 0.75rem;
+    top: calc(4.35rem + var(--safe-top));
+    right: max(0.75rem, var(--safe-right));
   }
 }
