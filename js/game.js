@@ -271,6 +271,35 @@ export class Game {
     });
 
     window.addEventListener("blur", clear);
+    window.addEventListener("resize", () => this.syncLookPadLift());
+    window.visualViewport?.addEventListener("resize", () => this.syncLookPadLift());
+  }
+
+  /** En teléfono real el card cubre las flechas: subirlas justo encima del dock. */
+  syncLookPadLift() {
+    const pad = document.getElementById("look-pad");
+    const dock = document.querySelector(".hud-dock");
+    if (!pad || !dock) return;
+
+    const customerOpen = !document.getElementById("customer-panel")?.classList.contains("hidden");
+    const phoneOpen = !document.getElementById("phone-ui")?.classList.contains("hidden");
+    const raise = customerOpen || phoneOpen;
+
+    if (!raise) {
+      pad.classList.remove("is-raised");
+      pad.style.removeProperty("--look-above-dock");
+      return;
+    }
+
+    // Doble rAF: en iOS el layout del card a veces llega un frame después
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const gap = 14;
+        const h = dock.getBoundingClientRect().height;
+        pad.style.setProperty("--look-above-dock", `${Math.round(h + gap)}px`);
+        pad.classList.add("is-raised");
+      });
+    });
   }
 
   /** Cocina atrás: horno/puerta. Sala al frente: congelador. */
@@ -776,10 +805,12 @@ export class Game {
   hideCustomerPanel() {
     document.getElementById("customer-panel").classList.add("hidden");
     document.getElementById("action-buttons").innerHTML = "";
+    this.syncLookPadLift();
   }
 
   hidePhone() {
     document.getElementById("phone-ui").classList.add("hidden");
+    this.syncLookPadLift();
   }
 
   spawnCustomer() {
@@ -856,6 +887,7 @@ export class Game {
       btn.onclick = () => this.resolveCustomer(key);
       box.appendChild(btn);
     });
+    this.syncLookPadLift();
   }
 
   resolveCustomer(action) {
@@ -906,6 +938,7 @@ export class Game {
     this.phoneTimer = 0;
     document.getElementById("phone-ui").classList.remove("hidden");
     document.getElementById("ring-count").textContent = "1";
+    this.syncLookPadLift();
     this.audio.ring();
     this.showInfo("El teléfono del mostrador…");
   }

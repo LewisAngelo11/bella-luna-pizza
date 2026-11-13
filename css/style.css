@@ -1049,6 +1049,13 @@ body:has(#screen-menu.entering) #vignette {
     height: 68px;
   }
 
+  /* Con card/teléfono: flechas justo encima del dock (altura real medida en JS) */
+  .look-pad.is-raised .look-btn {
+    top: auto;
+    bottom: var(--look-above-dock, 42%);
+    transform: none;
+  }
+
   #ambient-note {
     display: none;
   }
