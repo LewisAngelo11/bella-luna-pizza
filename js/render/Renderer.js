@@ -25,6 +25,7 @@ export class Renderer {
     this.hoverTable6 = false;
     this.hoverTarget = null;
     this.jumpscare = 0;
+    this.jumpShake = 0;
     this.pointerX = 0.5;
     this.pointerY = 0.5;
     this.lookEnabled = false;
@@ -48,6 +49,8 @@ export class Renderer {
     this.camera = new THREE.PerspectiveCamera(68, this.w / this.h, 0.05, 50);
     this.camera.position.set(0, 1.55, 0.2);
     this.camera.rotation.order = "YXZ";
+    // Necesario para que hijos de la cámara (jumpscare) se rendericen
+    this.scene.add(this.camera);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -212,8 +215,34 @@ export class Renderer {
 
   triggerJumpscare() {
     this.jumpscare = 1.8;
+    this.jumpShake = 1;
     this.jumpGroup.visible = true;
-    if (this.jumpLight) this.jumpLight.intensity = 12;
+    if (this.jumpVoid) this.jumpVoid.visible = true;
+    if (this.jumpLight) this.jumpLight.intensity = 16;
+    // Pose inicial ya visible (sin esperar al primer update)
+    this.jumpGroup.position.set(0, 0, -2.45);
+    this.jumpGroup.rotation.set(0, 0, 0);
+    this.jumpGroup.scale.setScalar(1.15);
+    this._fogBeforeJump = this.scene.fog?.density ?? 0.009;
+    this.scene.background.setHex(0x000000);
+    // Fog a 0: el plano negro tapa la sala; densidades altas ocultaban al demonio
+    if (this.scene.fog) {
+      this.scene.fog.color.setHex(0x000000);
+      this.scene.fog.density = 0;
+    }
+  }
+
+  clearJumpscare() {
+    this.jumpscare = 0;
+    this.jumpShake = 0;
+    if (this.jumpGroup) this.jumpGroup.visible = false;
+    if (this.jumpVoid) this.jumpVoid.visible = false;
+    if (this.jumpLight) this.jumpLight.intensity = 0;
+    this.scene.background.setHex(0x140e0a);
+    if (this.scene.fog) {
+      this.scene.fog.color.setHex(0x140e0a);
+      this.scene.fog.density = this._fogBeforeJump ?? 0.009;
+    }
   }
 
   update(dt, state) {
@@ -222,7 +251,15 @@ export class Renderer {
 
   draw(state) {
     const hour = state?.hourDecimal ?? 23;
-    this.scene.fog.density = hour >= 0 && hour < 5 ? 0.014 : 0.008;
+    if (this.jumpscare > 0) {
+      this.scene.background.setHex(0x000000);
+      if (this.scene.fog) {
+        this.scene.fog.color.setHex(0x000000);
+        this.scene.fog.density = 0;
+      }
+    } else {
+      this.scene.fog.density = hour >= 0 && hour < 5 ? 0.014 : 0.008;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }

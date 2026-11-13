@@ -34,10 +34,20 @@ export function updateFrame(r, dt, state) {
 
     const breath = Math.sin(r.t * 1.2) * 0.01;
     const camZ = r.lookingBehind ? 0.55 : 0.15;
-    r.camera.position.set(0, 1.62 + breath, camZ);
+    let shakeX = 0;
+    let shakeY = 0;
+    let shakeRoll = 0;
+    if (r.jumpscare > 0) {
+      const shakeAmt = Math.min(1, r.jumpscare / 1.8) * 0.055;
+      shakeX = Math.sin(r.t * 62) * shakeAmt + Math.sin(r.t * 91) * shakeAmt * 0.45;
+      shakeY = Math.cos(r.t * 73) * shakeAmt * 0.85;
+      shakeRoll = Math.sin(r.t * 55) * shakeAmt * 1.4;
+    }
+    r.camera.position.set(shakeX, 1.62 + breath + shakeY, camZ);
     r.camera.rotation.order = "YXZ";
     r.camera.rotation.y = r.baseYaw - r.yaw;
     r.camera.rotation.x = r.pitch;
+    r.camera.rotation.z = shakeRoll;
 
     const freezerTarget = r.freezerOpen ? -1.9 : 0;
     r.freezerDoorAngle += (freezerTarget - r.freezerDoorAngle) * Math.min(1, dt * 4);
@@ -172,21 +182,19 @@ export function updateFrame(r, dt, state) {
     if (r.jumpscare > 0) {
       r.jumpscare -= dt;
       r.jumpGroup.visible = true;
+      if (r.jumpVoid) r.jumpVoid.visible = true;
       const life = Math.max(0, r.jumpscare);
-      const rush = Math.min(1, (1.8 - life) / 1.8);
-      // Features están en −Z local; hay que girar para mirar a la cámara
-      r.jumpGroup.rotation.y = r.lookingBehind ? Math.PI : 0;
-      // Lejos → cerca; ojos quedan ~1.5–2u delante de la cámara
-      const z = r.lookingBehind
-        ? 3.1 - rush * 0.55
-        : -(3.1 - rush * 0.55);
+      // Ease-out: aparece cerca de inmediato y se abalanza
+      const t = Math.min(1, (1.8 - life) / 1.8);
+      const rush = 1 - (1 - t) * (1 - t);
+      const z = -(2.55 - rush * 0.95);
       r.jumpGroup.position.set(
-        Math.sin(r.t * 80) * 0.1,
-        1.55 + Math.sin(r.t * 45) * 0.06,
+        Math.sin(r.t * 80) * 0.06,
+        Math.sin(r.t * 45) * 0.04,
         z,
       );
-      r.jumpGroup.rotation.z = Math.sin(r.t * 60) * 0.1;
-      r.jumpGroup.scale.setScalar(1.1 + rush * 0.25);
+      r.jumpGroup.rotation.set(0, 0, Math.sin(r.t * 60) * 0.08);
+      r.jumpGroup.scale.setScalar(1.12 + rush * 0.28);
       if (r.jumpJaw) r.jumpJaw.rotation.x = -0.55 - Math.sin(r.t * 45) * 0.3;
       if (r.jumpEyeL) {
         const pulse = 1.0 + Math.sin(r.t * 55) * 0.4;
@@ -199,10 +207,23 @@ export function updateFrame(r, dt, state) {
       if (r.jumpLight) {
         r.jumpLight.intensity = 14 + Math.sin(r.t * 70) * 8;
       }
+      // Apagar luces de la sala para vacío negro
+      if (r.lamp) r.lamp.intensity = 0;
+      if (r.ambient) r.ambient.intensity = 0;
+      if (r.hemi) r.hemi.intensity = 0;
+      if (r.counterLight) r.counterLight.intensity = 0;
+      if (r.backLight) r.backLight.intensity = 0;
+      if (r.backLight2) r.backLight2.intensity = 0;
+      if (r.customerLight) r.customerLight.intensity = 0;
+      if (r.fill) r.fill.intensity = 0;
+      if (r.ovenLight) r.ovenLight.intensity = 0;
+      if (r.windowLight) r.windowLight.intensity = 0;
+      if (r.spotLamp) r.spotLamp.intensity = 0;
       if (r.jumpscare <= 0) {
-        r.jumpGroup.visible = false;
-        if (r.jumpLight) r.jumpLight.intensity = 0;
+        r.clearJumpscare?.();
       }
+    } else if (r.camera.rotation.z) {
+      r.camera.rotation.z = 0;
     }
 
     if (r.lookEnabled && r.hoverTarget) {

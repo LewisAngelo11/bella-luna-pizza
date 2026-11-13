@@ -1,21 +1,22 @@
 import * as THREE from "three";
 
 /**
- * Demonio jumpscare. Rasgos en +Z (miran a la cámara en la sala).
- * Si miras atrás: frameUpdate pone rotation.y = π.
+ * Demonio jumpscare. Rasgos en +Z.
+ * Va parentado a la cámara: siempre aparece delante de la vista del jugador.
  */
 export function setupJumpscare(r) {
   r.jumpGroup = new THREE.Group();
   r.jumpGroup.visible = false;
 
-  const skin = new THREE.MeshBasicMaterial({ color: 0xc5d0c0 });
-  const skinDark = new THREE.MeshBasicMaterial({ color: 0x5a6858 });
-  const voidMat = new THREE.MeshBasicMaterial({ color: 0x030006 });
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-  const eyeCore = new THREE.MeshBasicMaterial({ color: 0xfff8d0 });
-  const toothMat = new THREE.MeshBasicMaterial({ color: 0xfff8e8 });
-  const bloodMat = new THREE.MeshBasicMaterial({ color: 0xb00000 });
-  const hornMat = new THREE.MeshBasicMaterial({ color: 0x140606 });
+  // fog: false — el vacío negro de la escena no debe “comerse” al demonio
+  const skin = new THREE.MeshBasicMaterial({ color: 0xc5d0c0, fog: false });
+  const skinDark = new THREE.MeshBasicMaterial({ color: 0x5a6858, fog: false });
+  const voidMat = new THREE.MeshBasicMaterial({ color: 0x030006, fog: false });
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000, fog: false });
+  const eyeCore = new THREE.MeshBasicMaterial({ color: 0xfff8d0, fog: false });
+  const toothMat = new THREE.MeshBasicMaterial({ color: 0xfff8e8, fog: false });
+  const bloodMat = new THREE.MeshBasicMaterial({ color: 0xb00000, fog: false });
+  const hornMat = new THREE.MeshBasicMaterial({ color: 0x140606, fog: false });
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 16), skin);
   head.scale.set(1.15, 1.35, 1.0);
@@ -105,6 +106,22 @@ export function setupJumpscare(r) {
   r.jumpLight.position.set(0, 0.15, 1.2);
   r.jumpGroup.add(r.jumpLight);
 
-  r.jumpGroup.position.set(0, 1.55, -1.8);
-  r.scene.add(r.jumpGroup);
+  // Vacío negro fijo en la cámara (tapa toda la sala detrás del demonio)
+  const voidGeo = new THREE.PlaneGeometry(40, 40);
+  const voidMatBg = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    fog: false,
+    depthTest: true,
+    depthWrite: true,
+  });
+  r.jumpVoid = new THREE.Mesh(voidGeo, voidMatBg);
+  r.jumpVoid.position.set(0, 0, -4.8);
+  r.jumpVoid.renderOrder = -1;
+  r.jumpVoid.visible = false;
+  r.camera.add(r.jumpVoid);
+
+  // Delante de la cámara (local −Z); rasgos +Z miran al jugador
+  r.jumpGroup.position.set(0, 0, -2.15);
+  r.jumpGroup.renderOrder = 10;
+  r.camera.add(r.jumpGroup);
 }

@@ -72,16 +72,17 @@ html, body {
   pointer-events: none;
   position: absolute;
   inset: 0;
+  /* Viñeta roja semitransparente: no tapar el demonio 3D */
   background:
-    radial-gradient(circle at 50% 40%, rgba(160, 0, 0, 0.55), transparent 60%),
-    radial-gradient(circle at 50% 50%, rgba(40, 0, 20, 0.25), transparent 70%);
+    radial-gradient(circle at 50% 42%, rgba(180, 0, 0, 0.35), transparent 52%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.28), transparent 78%);
   opacity: 0;
-  transition: opacity 0.12s;
+  transition: opacity 0.1s;
 }
 
 #blood-flash.on {
   opacity: 1;
-  animation: scare-shake 0.45s linear;
+  animation: scare-shake 0.55s linear;
 }
 
 @keyframes scare-shake {
