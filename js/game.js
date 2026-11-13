@@ -463,6 +463,16 @@ export class Game {
     this.ovenOn = true;
     this.ovenOffDeadline = 0;
     this.ovenEventTimer = 45 + Math.random() * 50;
+    // Negligencia deliberada (regla 13): 8–10 s en mal estado → jumpscare
+    this.neglectFreezer = 0;
+    this.neglectOven = 0;
+    this.neglectDoor = 0;
+    this.neglectFreezerLimit = 0;
+    this.neglectOvenLimit = 0;
+    this.neglectDoorLimit = 0;
+    this.neglectFreezerWarned = false;
+    this.neglectOvenWarned = false;
+    this.neglectDoorWarned = false;
     this.lookingTable6 = false;
     this.renderer.setLookingBehind(false);
     this.syncBehindControls(false);
@@ -526,6 +536,12 @@ export class Game {
     this.renderer.setFreezerOpen(this.freezerOpen);
 
     if (this.freezerOpen) {
+      // Apertura a propósito (no evento auto): empieza el reloj de negligencia
+      if (!this.freezerAutoPhase) {
+        this.neglectFreezer = 0;
+        this.neglectFreezerLimit = 8 + Math.random() * 2;
+        this.neglectFreezerWarned = false;
+      }
       this.showInfo(
         fromClick
           ? "Abres el congelador. Escarcha, paquetes… y un silencio demasiado denso."
@@ -533,6 +549,10 @@ export class Game {
       );
       this.addFear(4);
     } else {
+      this.neglectFreezer = 0;
+      this.neglectFreezerLimit = 0;
+      this.neglectFreezerWarned = false;
+      this.clearWarningEvent("neglect_freezer");
       // Cerrar a tiempo cancela la emergencia de apertura sola
       if (this.freezerAutoPhase) {
         this.freezerAutoPhase = null;
@@ -556,9 +576,13 @@ export class Game {
       // Encender (cancela emergencia si venía de apagón solo)
       this.ovenOn = true;
       this.ovenOffDeadline = 0;
+      this.neglectOven = 0;
+      this.neglectOvenLimit = 0;
+      this.neglectOvenWarned = false;
       this.ovenEventTimer = this.nextOvenDelay();
       this.renderer.setOvenOn(true);
       this.clearWarningEvent("oven_off");
+      this.clearWarningEvent("neglect_oven");
       this.showInfo(
         fromClick
           ? "Reavivas las brasas. El horno vuelve a respirar."
@@ -568,12 +592,15 @@ export class Game {
       return;
     }
 
-    // Apagar manualmente (sin jumpscare; el peligro es cuando se apaga solo)
+    // Apagar manualmente: si lo dejas apagado ~8–10 s → jumpscare (regla 13)
     this.ovenOn = false;
     this.ovenOffDeadline = 0;
+    this.neglectOven = 0;
+    this.neglectOvenLimit = 8 + Math.random() * 2;
+    this.neglectOvenWarned = false;
     this.renderer.setOvenOn(false);
     this.clearWarningEvent("oven_off");
-    this.showInfo("Apagas el horno. Puedes volver a encenderlo con [H] o click.");
+    this.showInfo("Apagas el horno. No lo dejes así demasiado tiempo.");
   }
 
   toggleDoor() {
@@ -582,16 +609,23 @@ export class Game {
     this.doorLocked = !this.doorLocked;
     if (this.doorLocked) {
       this.eventCooldown = 0;
+      this.neglectDoor = 0;
+      this.neglectDoorLimit = 0;
+      this.neglectDoorWarned = false;
       // Tras cerrar de madrugada, puede volver a abrirse sola más tarde
       const hour = this.getDisplayHour();
       if (hour >= 2 && hour < 6) {
         this.doorAutoNextIn = this.nextDoorAutoDelay(true);
       }
       this.clearWarningEvent("door_open");
+      this.clearWarningEvent("neglect_door");
       this.showInfo("Cierras la puerta trasera y echas el cerrojo.");
     } else {
       this.eventCooldown = 0;
-      this.showInfo("Abres la puerta trasera. La noche se siente más cerca.");
+      this.neglectDoor = 0;
+      this.neglectDoorLimit = 8 + Math.random() * 2;
+      this.neglectDoorWarned = false;
+      this.showInfo("Abres la puerta trasera. No la dejes así demasiado tiempo.");
     }
   }
 
@@ -1112,6 +1146,67 @@ export class Game {
       }
     } else {
       this.eventCooldown = 0;
+    }
+
+    // —— Negligencia deliberada (regla 13): aviso a ~45%, jumpscare a 8–10 s ——
+    if (this.freezerOpen && !this.freezerAutoPhase && this.neglectFreezerLimit > 0) {
+      this.neglectFreezer += dt;
+      if (!this.neglectFreezerWarned && this.neglectFreezer >= this.neglectFreezerLimit * 0.45) {
+        this.neglectFreezerWarned = true;
+        this.showWarning("El congelador lleva demasiado tiempo abierto…", {
+          zone: "front",
+          eventId: "neglect_freezer",
+          isActive: () => this.freezerOpen && !this.freezerAutoPhase,
+          dur: 3.6,
+        });
+      }
+      if (this.neglectFreezer >= this.neglectFreezerLimit) {
+        this.die("neglect_freezer");
+        return;
+      }
+    } else if (!this.freezerOpen) {
+      this.neglectFreezer = 0;
+      this.neglectFreezerWarned = false;
+    }
+
+    if (!this.ovenOn && this.ovenOffDeadline <= 0 && this.neglectOvenLimit > 0) {
+      this.neglectOven += dt;
+      if (!this.neglectOvenWarned && this.neglectOven >= this.neglectOvenLimit * 0.45) {
+        this.neglectOvenWarned = true;
+        this.showWarning("El horno lleva demasiado tiempo apagado…", {
+          zone: "kitchen",
+          eventId: "neglect_oven",
+          isActive: () => !this.ovenOn && this.ovenOffDeadline <= 0,
+          dur: 3.6,
+        });
+      }
+      if (this.neglectOven >= this.neglectOvenLimit) {
+        this.die("neglect_oven");
+        return;
+      }
+    } else if (this.ovenOn) {
+      this.neglectOven = 0;
+      this.neglectOvenWarned = false;
+    }
+
+    if (!this.doorLocked && this.neglectDoorLimit > 0) {
+      this.neglectDoor += dt;
+      if (!this.neglectDoorWarned && this.neglectDoor >= this.neglectDoorLimit * 0.45) {
+        this.neglectDoorWarned = true;
+        this.showWarning("La puerta trasera sigue sin llave…", {
+          zone: "kitchen",
+          eventId: "neglect_door",
+          isActive: () => !this.doorLocked && this.neglectDoorLimit > 0,
+          dur: 3.6,
+        });
+      }
+      if (this.neglectDoor >= this.neglectDoorLimit) {
+        this.die("neglect_door");
+        return;
+      }
+    } else if (this.doorLocked) {
+      this.neglectDoor = 0;
+      this.neglectDoorWarned = false;
     }
 
     // —— Horno: apagón espontáneo (pausado 22:00–23:00) ——

@@ -49,6 +49,10 @@ export const RULES = [
     id: "freezer_auto",
     text: "Si el congelador se abre solo, puede cerrarse solo… o no. Si no lo hace, ciérralo tú antes de cinco segundos.",
   },
+  {
+    id: "neglect",
+    text: "No dejes el congelador abierto, el horno apagado ni la puerta trasera sin llave.",
+  },
 ];
 
 /** Plantillas de clientes normales */
@@ -182,6 +186,21 @@ export const DEATHS = {
     title: "Abierto",
     message: "El congelador quedó entreabierto demasiado tiempo. La escarcha aprendió tu nombre.",
     detail: "Regla rota: si el congelador se abre solo, ciérralo a tiempo.",
+  },
+  neglect_freezer: {
+    title: "Escarcha",
+    message: "Dejaste el congelador abierto demasiado rato. Algo salió con el frío… y no volvió a entrar.",
+    detail: "Regla rota: no dejes el congelador abierto a propósito.",
+  },
+  neglect_oven: {
+    title: "Brasas muertas",
+    message: "Apagaste el horno y lo dejaste así. En la oscuridad del hogar, otra cosa encontró calor.",
+    detail: "Regla rota: no dejes el horno apagado a propósito.",
+  },
+  neglect_door: {
+    title: "Umbral",
+    message: "La puerta trasera quedó abierta. La noche no pide permiso para pasar.",
+    detail: "Regla rota: no dejes la puerta trasera sin llave.",
   },
   fear: {
     title: "Ruptura",
