@@ -13,9 +13,9 @@ export function updateFrame(r, dt, state) {
     if (r.lookHoldX || r.lookHoldY) {
       const maxYaw = r.maxLookYaw();
       const maxPitch = r.maxLookPitch();
-      const speed = 1.75;
-      r.targetYaw = Math.max(-maxYaw, Math.min(maxYaw, r.targetYaw + r.lookHoldX * speed * dt));
-      r.targetPitch = Math.max(-maxPitch, Math.min(maxPitch, r.targetPitch + r.lookHoldY * speed * dt));
+      const lookSpeed = r.isMobileLook?.() ? 2.58 : 1.75;
+      r.targetYaw = Math.max(-maxYaw, Math.min(maxYaw, r.targetYaw + r.lookHoldX * lookSpeed * dt));
+      r.targetPitch = Math.max(-maxPitch, Math.min(maxPitch, r.targetPitch + r.lookHoldY * lookSpeed * dt));
       r.lookEnabled = true;
     } else {
       const maxYaw = r.maxLookYaw();

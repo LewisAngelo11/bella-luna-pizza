@@ -42,6 +42,7 @@ html, body {
   background: #050302;
   z-index: 0;
   transition: opacity 0.35s ease;
+  touch-action: none;
 }
 
 #grain {
@@ -578,8 +579,46 @@ body:has(#screen-menu.entering) #vignette {
 #screen-hud .rules-panel,
 #screen-hud .customer-panel,
 #screen-hud .phone-ui,
-#screen-hud .look-btn {
+#screen-hud .look-btn,
+#screen-hud .mobile-controls,
+#screen-hud .mobile-ctrl {
   pointer-events: auto;
+}
+
+/* Controles FNAF (solo móvil / touch) */
+.mobile-controls {
+  display: none;
+  width: 100%;
+  gap: 0.65rem;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0.55rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.82), transparent);
+  box-sizing: border-box;
+}
+
+.mobile-ctrl {
+  flex: 1 1 0;
+  min-height: 56px;
+  max-width: 200px;
+  border: 1px solid rgba(232, 180, 120, 0.4);
+  background: rgba(12, 8, 6, 0.78);
+  color: var(--paper);
+  font-family: "Cinzel", serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+}
+
+.mobile-ctrl:active,
+.mobile-ctrl-hold:active {
+  border-color: var(--ember);
+  background: rgba(40, 18, 12, 0.92);
+  color: var(--cheese);
 }
 
 /* Dock inferior: panel cliente / teléfono siempre encima de las acciones */
@@ -604,6 +643,7 @@ body:has(#screen-menu.entering) #vignette {
 .look-btn {
   position: absolute;
   top: 46%;
+  bottom: auto;
   transform: translateY(-50%);
   width: 52px;
   height: 72px;
@@ -621,6 +661,7 @@ body:has(#screen-menu.entering) #vignette {
   align-items: center;
   justify-content: center;
   opacity: 0.88;
+  transition: top 0.28s ease, bottom 0.28s ease, transform 0.28s ease;
 }
 
 .look-btn:active {
@@ -949,6 +990,15 @@ body:has(#screen-menu.entering) #vignette {
     display: block;
   }
 
+  .mobile-controls {
+    display: flex;
+  }
+
+  /* Estilo FNAF: sin barra de texto; interacción por tap 3D */
+  .hud-bottom {
+    display: none;
+  }
+
   .hud-top {
     flex-wrap: wrap;
     /* más aire a la derecha para no pegar cordura/turno al botón de pausa */
@@ -975,7 +1025,8 @@ body:has(#screen-menu.entering) #vignette {
     bottom: auto;
     width: auto;
     margin: 0 0.55rem 0.45rem;
-    max-height: min(34vh, 260px);
+    /* sin scroll en cards normales; solo si el contenido es enorme */
+    max-height: min(70vh, 520px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -988,16 +1039,6 @@ body:has(#screen-menu.entering) #vignette {
     align-self: center;
     margin: 0 0.55rem 0.45rem;
     max-width: calc(100% - 1.1rem);
-  }
-
-  .hud-bottom {
-    gap: 0.3rem;
-    padding: 0.65rem 0.65rem max(0.85rem, env(safe-area-inset-bottom));
-  }
-
-  .hud-bottom .btn.small {
-    font-size: 0.68rem;
-    padding: 0.42rem 0.55rem;
   }
 
   .look-btn {

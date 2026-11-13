@@ -107,6 +107,12 @@ export class Game {
       this.showScreen("rules");
     };
     document.getElementById("btn-close-rules").onclick = () => {
+      if (this.paused) {
+        document.getElementById("screen-rules").classList.remove("active");
+        document.getElementById("screen-hud").classList.add("active");
+        document.getElementById("screen-pause").classList.add("active");
+        return;
+      }
       if (this.playing) {
         this.showScreen("hud");
         return;
@@ -129,28 +135,16 @@ export class Game {
     document.getElementById("btn-pause").onclick = () => this.pauseGame();
     document.getElementById("btn-resume").onclick = () => this.resumeGame();
     document.getElementById("btn-pause-quit").onclick = () => this.quitToMenu();
+    document.getElementById("btn-pause-rules").onclick = () => this.openRulesFromPause();
 
     document.getElementById("btn-toggle-rules").onclick = () => this.toggleRulesPanel();
     document.getElementById("btn-check-freezer").onclick = () => this.checkFreezer();
     document.getElementById("btn-toggle-oven").onclick = () => this.toggleOven();
     document.getElementById("btn-lock-door").onclick = () => this.toggleDoor();
-    document.getElementById("btn-look-back").onclick = () => {
-      if (!this.playing) return;
-      const behind = this.renderer.toggleLookingBehind();
-      this.syncBehindControls(behind);
-      this.audio.click();
-      this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
-    };
-    const eyesBtn = document.getElementById("btn-close-eyes");
-    const eyesOn = (e) => {
-      e.preventDefault();
-      this.setEyesClosed(true);
-    };
-    const eyesOff = () => this.setEyesClosed(false);
-    eyesBtn.addEventListener("pointerdown", eyesOn);
-    eyesBtn.addEventListener("pointerup", eyesOff);
-    eyesBtn.addEventListener("pointercancel", eyesOff);
-    eyesBtn.addEventListener("pointerleave", eyesOff);
+    document.getElementById("btn-look-back").onclick = () => this.turnAround();
+    document.getElementById("btn-mobile-turn").onclick = () => this.turnAround();
+    this.bindEyesHold(document.getElementById("btn-close-eyes"));
+    this.bindEyesHold(document.getElementById("btn-mobile-eyes"));
 
     document.querySelectorAll("[data-phone]").forEach((btn) => {
       btn.onclick = () => this.handlePhone(btn.dataset.phone);
@@ -177,19 +171,73 @@ export class Game {
       if (e.code === "Space") this.setEyesClosed(false);
     });
 
-    // Look suave + clicks en el mundo 3D
+    // Look suave (desktop) + tap/click en el mundo 3D
     window.addEventListener("mousemove", (e) => this.onPointer(e, false));
-    this.canvas.addEventListener("mousedown", (e) => this.onPointer(e, true));
+    this.bindCanvasInteract();
     this.canvas.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (!this.playing) return;
-      const behind = this.renderer.toggleLookingBehind();
-      this.syncBehindControls(behind);
-      this.audio.click();
-      this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
+      this.turnAround();
     });
 
     this.bindLookPad();
+  }
+
+  turnAround() {
+    if (!this.playing || this.paused) return;
+    const behind = this.renderer.toggleLookingBehind();
+    this.syncBehindControls(behind);
+    this.audio.click();
+    this.showViewInfo(behind ? "Vista a la cocina." : "Vista al comedor.");
+  }
+
+  bindEyesHold(el) {
+    if (!el) return;
+    const on = (e) => {
+      e.preventDefault();
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      this.setEyesClosed(true);
+    };
+    const off = () => this.setEyesClosed(false);
+    el.addEventListener("pointerdown", on);
+    el.addEventListener("pointerup", off);
+    el.addEventListener("pointercancel", off);
+    el.addEventListener("lostpointercapture", off);
+  }
+
+  /** Tap corto en el canvas = interactuar con objetos 3D (móvil y desktop). */
+  bindCanvasInteract() {
+    let ptr = null;
+    this.canvas.addEventListener("pointerdown", (e) => {
+      if (e.button === 2) return;
+      ptr = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this.onPointer(e, false);
+    });
+    this.canvas.addEventListener("pointerup", (e) => {
+      if (e.button === 2 || !ptr) return;
+      const dx = e.clientX - ptr.x;
+      const dy = e.clientY - ptr.y;
+      const dt = performance.now() - ptr.t;
+      ptr = null;
+      if (dx * dx + dy * dy > 400 || dt > 500) return;
+      this.onPointer(e, true);
+    });
+    this.canvas.addEventListener("pointercancel", () => {
+      ptr = null;
+    });
+  }
+
+  openRulesFromPause() {
+    if (!this.paused) return;
+    this.audio?.click?.();
+    this.updateRulesButtons();
+    document.getElementById("screen-pause").classList.remove("active");
+    document.getElementById("screen-hud").classList.remove("active");
+    document.getElementById("screen-rules").classList.add("active");
+    this.ensureAmbience().then(() => this.audio?.paperFlip?.());
   }
 
   /** En touch/móvil, el look lo llevan las flechas (el ratón en desktop sigue igual). */
@@ -448,7 +496,7 @@ export class Game {
     this.updateFearUI();
     this.updateClockUI();
     this.showScreen("hud");
-    this.showInfo("Turno iniciado. Click: congelador / horno / puerta. Click derecho: mirar atrás.", 4);
+    this.showInfo("Turno iniciado. Toca/click objetos para interactuar. Gira para ver la cocina.", 4);
   }
 
   toggleRulesPanel() {

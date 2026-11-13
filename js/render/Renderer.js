@@ -112,10 +112,19 @@ export class Renderer {
     this.resize();
   }
 
+  isMobileLook() {
+    return (
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 720px)").matches
+    );
+  }
+
   resize() {
     this.w = window.innerWidth;
     this.h = window.innerHeight;
     this.camera.aspect = this.w / this.h;
+    // En móvil el FOV horizontal se estrecha; abrimos un poco para ver horno/congelador
+    this.camera.fov = this.isMobileLook() ? 78 : 68;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.w, this.h, false);
   }
@@ -160,11 +169,14 @@ export class Renderer {
   }
 
   maxLookYaw() {
+    if (this.isMobileLook()) {
+      return this.lookingBehind ? 0.85 : 1.05;
+    }
     return this.lookingBehind ? 0.4 : 0.55;
   }
 
   maxLookPitch() {
-    return 0.28;
+    return this.isMobileLook() ? 0.36 : 0.28;
   }
 
   setPointer(clientX, clientY, enabled, driveLook = true) {
