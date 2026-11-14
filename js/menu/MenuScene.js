@@ -645,6 +645,7 @@ export class MenuScene {
     const cam = this._camBase;
 
     // dist = atrás; rightOff = derecha en pantalla; capas separadas anti-parpadeo
+    // Puntos originales intactos; se alarga a ambos lados para que no se corten las bases
     const layers = [
       {
         color: 0x152030,
@@ -652,7 +653,9 @@ export class MenuScene {
         rightOff: 34,
         hScale: 1.2,
         points: [
+          [-28, 2], [-20, 8], [-12, 4], [-6, 11],
           [0, 2], [6, 9], [12, 5], [18, 14], [26, 7], [34, 16], [42, 8], [50, 12], [58, 3],
+          [66, 10], [74, 5], [82, 12], [90, 4], [98, 2],
         ],
       },
       {
@@ -661,7 +664,9 @@ export class MenuScene {
         rightOff: 32,
         hScale: 1.0,
         points: [
+          [-24, 1.5], [-16, 6], [-8, 3],
           [0, 1.5], [7, 7], [14, 4], [22, 11], [30, 6], [38, 13], [46, 5], [54, 2],
+          [62, 8], [70, 4], [78, 10], [86, 3], [94, 1.5],
         ],
       },
       {
@@ -670,7 +675,9 @@ export class MenuScene {
         rightOff: 22,
         hScale: 0.85,
         points: [
+          [-24, 1], [-16, 5], [-8, 2.5],
           [0, 1], [8, 5.5], [16, 3], [24, 9], [32, 4.5], [40, 7.5], [48, 2],
+          [56, 6], [64, 3.5], [72, 7], [80, 2.5], [88, 1],
         ],
       },
     ];
