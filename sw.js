@@ -1,5 +1,5 @@
 /* Bella Luna Pizza — service worker (cache shell + assets del origen) */
-const CACHE = "bella-luna-v49";
+const CACHE = "bella-luna-v73";
 
 const PRECACHE = [
   "./",
@@ -8,6 +8,7 @@ const PRECACHE = [
   "./css/style.css",
   "./js/main.js",
   "./js/game.js",
+  "./js/devPreview.js",
   "./js/rules.js",
   "./js/audio.js",
   "./js/renderer.js",

@@ -8,6 +8,11 @@ import {
 import { Renderer } from "./renderer.js";
 import { AudioEngine } from "./audio.js";
 import { MenuScene, VERSION as MENU_VERSION } from "./menu/MenuScene.js";
+import {
+  parseDevPreview,
+  resolvePreviewCustomer,
+  listPreviewCustomerIds,
+} from "./devPreview.js";
 
 export class Game {
   constructor() {
@@ -20,6 +25,9 @@ export class Game {
     const ver = document.getElementById("menu-version");
     if (ver) ver.textContent = MENU_VERSION;
 
+    this.devPreview = false;
+    this._previewIds = listPreviewCustomerIds();
+    this._previewIndex = 0;
     this.playing = false;
     this.timeMinutes = 22 * 60; // 22:00
     this.endMinutes = 6 * 60 + 24 * 60; // 06:00 next day as absolute
@@ -60,16 +68,122 @@ export class Game {
     this.hoverTable6 = false;
     this.lastTs = 0;
     this.dripTimer = 0;
+    this.coffeeCooldown = 0;
+    this.coffeeReadyAnnounced = true;
 
     this.briefingOnly = false;
     this.paused = false;
     this.bindUI();
     this.populateRules();
-    this.showScreen("menu");
-    this.menuScene.setActive(true);
-    this._bindMenuAmbienceUnlock();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+
+    const preview = parseDevPreview();
+    if (preview?.kind === "customer") {
+      this.startDevCustomerPreview(preview.id);
+    } else {
+      this.showScreen("menu");
+      this.menuScene.setActive(true);
+      this._bindMenuAmbienceUnlock();
+    }
+  }
+
+  /** Solo localhost: spawnea cliente sin reloj ni eventos. */
+  startDevCustomerPreview(id = "normal") {
+    const customer = resolvePreviewCustomer(id);
+    if (!customer) {
+      console.warn(`[devPreview] no se pudo resolver id="${id}"`);
+      this.showScreen("menu");
+      this.menuScene.setActive(true);
+      this._bindMenuAmbienceUnlock();
+      return;
+    }
+
+    this.devPreview = true;
+    this.playing = true;
+    this.paused = false;
+    this.timeMinutes = 23 * 60 + 30;
+    this.fear = 0;
+    this.doorLocked = true;
+    this.freezerOpen = false;
+    this.freezerKnock = false;
+    this.ovenOn = true;
+    this.flickerIntensity = 0;
+    this.eyesClosed = false;
+    this.currentCustomer = null;
+    this.phoneActive = false;
+    this.customerAttendTimer = 0;
+    this.customerAttendTicks = 0;
+
+    this.renderer.setLookingBehind(false);
+    this.syncBehindControls(false);
+    this.renderer.setFreezerOpen(false);
+    this.renderer.setOvenOn(true);
+    document.getElementById("eyes-closed").classList.add("hidden");
+    document.getElementById("rules-panel").classList.remove("open");
+    this.hidePhone();
+    this.hideWarningBanner();
+    this.hideInfoBanner();
+    this.updateFearUI();
+    this.updateClockUI();
+    this.showScreen("hud");
+
+    this._previewIndex = Math.max(0, this._previewIds.indexOf(customer.previewId));
+    this.applyDevPreviewCustomer(customer);
+    this._bindDevPreviewKeys();
+
+    console.info(
+      `[devPreview] cliente "${customer.previewId}". [ / ] o ←/→ para ciclar. IDs: ${this._previewIds.join(", ")}`,
+    );
+  }
+
+  applyDevPreviewCustomer(customer) {
+    this.currentCustomer = customer;
+    this.renderer.setCustomer(customer);
+    this.showCustomerUI(customer);
+    // Sin acciones de partida: solo mirar el modelo
+    const box = document.getElementById("action-buttons");
+    if (box) {
+      box.innerHTML = "";
+      const note = document.createElement("p");
+      note.className = "hint";
+      note.style.margin = "0.35rem 0 0";
+      note.style.fontSize = "0.7rem";
+      note.textContent = `DEV PREVIEW · ${customer.previewId} · [ ] ciclar`;
+      box.appendChild(note);
+    }
+    this.showInfo(`Preview: ${customer.previewId}`, 3.5);
+    const status = document.getElementById("shift-status");
+    if (status) status.textContent = "DEV PREVIEW";
+    const note = document.getElementById("ambient-note");
+    if (note) note.textContent = `Preview · ${customer.previewId} · [ ] ciclar plantillas`;
+  }
+
+  cycleDevPreview(dir = 1) {
+    if (!this.devPreview || !this._previewIds.length) return;
+    const n = this._previewIds.length;
+    this._previewIndex = (this._previewIndex + dir + n) % n;
+    const id = this._previewIds[this._previewIndex];
+    const customer = resolvePreviewCustomer(id);
+    if (customer) this.applyDevPreviewCustomer(customer);
+  }
+
+  _bindDevPreviewKeys() {
+    if (this._previewKeysBound) return;
+    this._previewKeysBound = true;
+    window.addEventListener("keydown", (e) => {
+      if (!this.devPreview) return;
+      if (e.key === "]" || e.key === "ArrowRight") {
+        e.preventDefault();
+        this.cycleDevPreview(1);
+      } else if (e.key === "[" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        this.cycleDevPreview(-1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.quitToMenu();
+      }
+    });
   }
 
   /** Ambientación nocturna también en menú (requiere gesto del usuario). */
@@ -167,6 +281,9 @@ export class Game {
     document.getElementById("btn-menu").onclick = () => {
       this.playing = false;
       this.paused = false;
+      this.devPreview = false;
+      this.renderer.setCustomer(null);
+      this.hideCustomerPanel();
       this.ensureAmbience();
       this.showScreen("menu");
     };
@@ -190,6 +307,7 @@ export class Game {
     });
 
     window.addEventListener("keydown", (e) => {
+      if (this.devPreview) return;
       if (e.code === "Escape") {
         e.preventDefault();
         if (this.paused) this.resumeGame();
@@ -207,6 +325,7 @@ export class Game {
       }
     });
     window.addEventListener("keyup", (e) => {
+      if (this.devPreview) return;
       if (e.code === "Space") this.setEyesClosed(false);
     });
 
@@ -384,6 +503,10 @@ export class Game {
       if (this.isLookingBehind()) this.toggleDoor();
       return;
     }
+    if (target === "coffee") {
+      if (!this.isLookingBehind()) this.useCoffee();
+      return;
+    }
     if (target === "table6") {
       this.showInfo("Estás mirando la mesa junto al congelador…");
     }
@@ -502,6 +625,7 @@ export class Game {
   quitToMenu() {
     this.paused = false;
     this.playing = false;
+    this.devPreview = false;
     this.setEyesClosed(false);
     this.renderer?.clearLookHold();
     this.renderer.setCustomer(null);
@@ -533,6 +657,9 @@ export class Game {
     this.ovenOn = true;
     this.ovenOffDeadline = 0;
     this.ovenEventTimer = 45 + Math.random() * 50;
+    this.coffeeCooldown = 0;
+    this.coffeeReadyAnnounced = true;
+    this.syncCoffeeReadyLight();
     // Negligencia deliberada (regla 13): 8–10 s en mal estado → jumpscare
     this.neglectFreezer = 0;
     this.neglectOven = 0;
@@ -639,6 +766,31 @@ export class Game {
       }
       this.addFear(-1);
     }
+  }
+
+  /** Café del turno: +10% cordura; se recarga sola tras el cooldown. */
+  useCoffee() {
+    if (!this.playing || this.paused || this.isLookingBehind()) return;
+    this.audio.click();
+    if ((this.coffeeCooldown ?? 0) > 0) {
+      const sec = Math.ceil(this.coffeeCooldown);
+      this.showInfo(`La cafetera se está recargando… (${sec}s)`);
+      return;
+    }
+    this.coffeeCooldown = 45;
+    this.coffeeReadyAnnounced = false;
+    this.addFear(-10);
+    this.syncCoffeeReadyLight();
+    this.showInfo("Un café corto. El turno pesa un poco menos. (+10% cordura)");
+  }
+
+  syncCoffeeReadyLight() {
+    const light = this.renderer?.coffeeReadyLight;
+    if (!light?.material) return;
+    const ready = (this.coffeeCooldown ?? 0) <= 0;
+    light.material.emissiveIntensity = ready ? 0.85 : 0.12;
+    light.material.color.setHex(ready ? 0xff4422 : 0x4a3030);
+    light.material.emissive.setHex(ready ? 0xcc2200 : 0x221010);
   }
 
   toggleOven(fromClick = false) {
@@ -942,6 +1094,7 @@ export class Game {
   }
 
   resolveCustomer(action) {
+    if (this.devPreview) return;
     const c = this.currentCustomer;
     if (!c) return;
     this.audio.click();
@@ -1131,6 +1284,7 @@ export class Game {
   }
 
   die(kind, customMsg, customDetail) {
+    if (this.devPreview) return;
     // Abrir ojos antes de cortar el turno (setEyesClosed no actúa si !playing)
     this.setEyesClosed(false);
     this.playing = false;
@@ -1178,6 +1332,20 @@ export class Game {
   }
 
   update(dt) {
+    if (this.devPreview) {
+      this.renderer.update(dt, {
+        flickerIntensity: 0.04,
+        lookingTable6: false,
+        doorLocked: true,
+        freezerKnock: false,
+        freezerOpen: false,
+        ovenOn: true,
+        hourDecimal: this.getHourDecimal(),
+        hoverTable6: false,
+      });
+      return;
+    }
+
     if (!this.playing || this.paused) {
       this.renderer.update(dt, {
         flickerIntensity: this.paused ? 0.08 : 0.05,
@@ -1203,6 +1371,15 @@ export class Game {
     }
 
     this.updateClockUI();
+
+    if ((this.coffeeCooldown ?? 0) > 0) {
+      this.coffeeCooldown = Math.max(0, this.coffeeCooldown - dt);
+      this.syncCoffeeReadyLight();
+      if (this.coffeeCooldown <= 0 && !this.coffeeReadyAnnounced) {
+        this.coffeeReadyAnnounced = true;
+        this.showInfo("La cafetera está lista otra vez.", 2.2);
+      }
+    }
 
     // Mesa 6
     if (this.lookingTable6 && !this.eyesClosed) {
