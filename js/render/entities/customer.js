@@ -60,12 +60,6 @@ export function setupCustomer(r) {
   hairMesh.castShadow = true;
   r.customerGroup.add(hairMesh);
 
-  // Relleno suave en la cara: quita la sombra bajo la barbilla en clientes sin sombra
-  r.customerFaceLight = new THREE.PointLight(0xfff2e0, 0, 1.6, 2);
-  r.customerFaceLight.position.set(0, 1.78, 0.42);
-  r.customerFaceLight.castShadow = false;
-  r.customerGroup.add(r.customerFaceLight);
-
   // Ojos
   r.eyeL = new THREE.Mesh(
     new THREE.SphereGeometry(0.042, 10, 10),
@@ -93,30 +87,51 @@ export function setupCustomer(r) {
     0, 1.59, 0.22, r.customerGroup, { cast: false }
   );
 
-  // Sombra en el suelo
+  // Sombra ovalada en la tapa del mostrador (silueta del cliente)
   r.customerShadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.42, 22),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 })
+    new THREE.CircleGeometry(0.28, 28),
+    new THREE.MeshStandardMaterial({
+      color: 0x0a0604,
+      transparent: true,
+      opacity: 0.12,
+      roughness: 0.95,
+      metalness: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    }),
   );
   r.customerShadow.rotation.x = -Math.PI / 2;
-  r.customerShadow.position.y = 0.02;
-  r.customerGroup.add(r.customerShadow);
+  r.customerShadow.scale.set(0.5, 1.15, 1); // óvalo hacia el cliente
+  r.customerShadow.position.set(0, 1.02, 1.22);
+  r.customerShadow.renderOrder = 4;
+  r.customerShadow.castShadow = false;
+  r.customerShadow.receiveShadow = true;
+  r.customerShadow.visible = false;
+  r.root.add(r.customerShadow);
 
-  // Dientes (anomalía)
+  // Dientes (anomalía): rectangulares; más altos al centro, más chicos a los lados → sonrisa
   r.teethGroup = new THREE.Group();
   r.teethGroup.visible = false;
-  for (let i = 0; i < 12; i++) {
-    r.box(
-      0.025, 0.08, 0.02,
-      new THREE.MeshStandardMaterial({ color: 0xfff5e6 }),
-      -0.14 + i * 0.025, 1.57, 0.23, r.teethGroup, { cast: false }
-    );
+  const toothCount = 10;
+  const toothMat = new THREE.MeshStandardMaterial({ color: 0xfff5e6, roughness: 0.55 });
+  for (let i = 0; i < toothCount; i++) {
+    const t = i / (toothCount - 1); // 0…1
+    const edge = Math.abs(t - 0.8) * 2; // 0 centro → 1 extremos
+    const h = 0.085 - edge * 0.045; // centro alto, laterales chicos
+    const w = 0.028 - edge * 0.005;
+    const x = -0.14 + i * 0.03;
+    // Curva suave de sonrisa: extremos un poco más arriba
+    const y = 1.57 + edge * 0.018 + (0.085 - h) * 0.35;
+    r.box(w, h, 0.022, toothMat, x, y, 0.23, r.teethGroup, { cast: false });
   }
   r.customerGroup.add(r.teethGroup);
 
   // Guardar qué piezas proyectan sombra (para restaurar en clientes normales)
   r.customerGroup.traverse((obj) => {
-    if (obj.isMesh && obj !== r.customerShadow) {
+    if (obj.isMesh) {
       obj.userData.castShadowDefault = !!obj.castShadow;
     }
   });
@@ -126,8 +141,9 @@ export function setupCustomer(r) {
 
 function setCustomerBodyShadows(r, enabled) {
   r.customerGroup?.traverse((obj) => {
-    if (!obj.isMesh || obj === r.customerShadow) return;
+    if (!obj.isMesh) return;
     obj.castShadow = enabled ? !!obj.userData.castShadowDefault : false;
+    obj.receiveShadow = enabled;
   });
 }
 
@@ -135,8 +151,8 @@ export function applyCustomer(r, c) {
   r.customer = c;
   if (!c) {
     r.customerGroup.visible = false;
+    if (r.customerShadow) r.customerShadow.visible = false;
     if (r.customerLight) r.customerLight.intensity = 0;
-    if (r.customerFaceLight) r.customerFaceLight.intensity = 0;
     return;
   }
   r.customerGroup.visible = true;
@@ -147,10 +163,9 @@ export function applyCustomer(r, c) {
   }
   const traits = c.traits || {};
   const hasShadow = traits.shadow !== false;
-  r.customerShadow.visible = hasShadow;
-  // Sin sombra: ni blob en el suelo ni proyección del cuerpo; luz suave en la cara
+  // Normales: sombra en la tapa del mostrador. Sin sombra: no se muestra.
+  if (r.customerShadow) r.customerShadow.visible = hasShadow;
   setCustomerBodyShadows(r, hasShadow);
-  if (r.customerFaceLight) r.customerFaceLight.intensity = hasShadow ? 0 : 1.15;
   if (traits.redEyes) {
     const m = new THREE.MeshStandardMaterial({
       color: 0xff1111, emissive: 0xff0000, emissiveIntensity: 1.5,
